@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Student Manager - Học sinh</title>
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+  <!-- Particles Background -->
+  <div id="particles-js"></div>
+
+  <div class="navbar">
+    <div class="nav-content">
+      <h2>SMS</h2>
+      <nav>
+        <a href="dashboard.html" class="nav-item">🏠 Trang chủ</a>
+        <a href="classes.html" class="nav-item">📚 Lớp học</a>
+        <a href="students.html" class="nav-item active">👥 Học sinh</a>
+        <a href="#" id="btn-logout" class="nav-item">🚪 Đăng xuất</a>
+      </nav>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="main-content">
+      <header class="page-header">
+        <h1>Quản lý Học sinh</h1>
+        <div class="header-controls">
+          <select id="filter-class" class="input-field">
+            <option value="">Tất cả lớp</option>
+          </select>
+          <input type="text" id="search-student" placeholder="Tìm theo tên hoặc mã..." class="input-field">
+          <button id="btn-add-student" class="btn-primary">+ Thêm học sinh</button>
+          <button id="btn-manage-classes" class="btn-secondary">📚 Quản lý lớp</button>
+        </div>
+      </header>
+
+      <div class="students-grid" id="students-list">
+        <!-- Students will be loaded here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for adding/editing student -->
+  <div id="student-modal" class="modal hidden">
+    <div class="modal-content glass">
+      <h3 id="student-modal-title">Thêm học sinh</h3>
+      <input type="text" id="stu-name" placeholder="Họ tên" class="input-field">
+      <input type="text" id="stu-id" placeholder="Mã học sinh" class="input-field">
+      <input type="text" id="stu-birthdate" placeholder="Ngày sinh (DD/MM/YYYY)" class="input-field">
+      <input type="text" id="stu-phone" placeholder="SĐT liên hệ" class="input-field">
+      <input type="email" id="stu-email" placeholder="Email" class="input-field">
+      
+      <div class="input-group">
+        <select id="stu-class" class="input-field">
+          <option value="">Chọn lớp</option>
+        </select>
+        <button type="button" id="btn-quick-add-class" class="btn-icon" title="Thêm lớp mới">+</button>
+      </div>
+      
+      <select id="stu-gender" class="input-field">
+        <option value="">Giới tính</option>
+        <option value="male">Nam</option>
+        <option value="female">Nữ</option>
+      </select>
+      <label class="file-label">
+        Ảnh học sinh:
+        <input type="file" id="stu-photo" accept="image/*">
+      </label>
+      <div class="modal-actions">
+        <button id="save-student" class="btn-primary">Lưu</button>
+        <button id="close-student-modal" class="btn-secondary">Hủy</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for managing classes -->
+  <div id="classes-modal" class="modal hidden">
+    <div class="modal-content glass large-modal">
+      <h3>Quản lý Lớp học</h3>
+      
+      <div class="modal-section">
+        <h4>Thêm lớp mới</h4>
+        <div class="form-row">
+          <input type="text" id="new-class-name" placeholder="Tên lớp (VD: 10A1)" class="input-field">
+          <input type="text" id="new-class-grade" placeholder="Khối (VD: 10)" class="input-field">
+          <input type="text" id="new-class-teacher" placeholder="Giáo viên chủ nhiệm" class="input-field">
+          <button id="btn-add-class" class="btn-primary">Thêm lớp</button>
+        </div>
+      </div>
+
+      <div class="modal-section">
+        <h4>Danh sách lớp học</h4>
+        <div class="classes-list" id="classes-list-container">
+          <!-- Classes will be loaded here -->
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button id="close-classes-modal" class="btn-secondary">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick add class modal -->
+  <div id="quick-class-modal" class="modal hidden">
+    <div class="modal-content glass">
+      <h3>Thêm lớp nhanh</h3>
+      <input type="text" id="quick-class-name" placeholder="Tên lớp (VD: 10A1)" class="input-field">
+      <input type="text" id="quick-class-grade" placeholder="Khối (VD: 10)" class="input-field">
+      <div class="modal-actions">
+        <button id="save-quick-class" class="btn-primary">Thêm</button>
+        <button id="close-quick-class-modal" class="btn-secondary">Hủy</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
+
+  <!-- Firebase Config -->
+  <script src="js/firebase-config.js"></script>
+  <script src="js/firebase-init.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/particles.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/students-manager.js"></script>
+</body>
+</html>

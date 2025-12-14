@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Student Manager - Trang chủ</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+  <!-- Particles Background -->
+  <div id="particles-js"></div>
+
+  <div class="navbar">
+    <div class="nav-content">
+      <h2>Student Manager System</h2>
+      <nav>
+        <a href="dashboard.html" class="nav-item active">
+            <i class="fa-solid fa-house"></i> Trang chủ
+        </a>
+
+        <a href="classes.html" class="nav-item">
+            <i class="fa-solid fa-book"></i> Lớp học
+        </a>
+
+        <a href="students.html" class="nav-item">
+            <i class="fa-solid fa-users"></i> Học sinh
+        </a>
+
+        <a href="index.html" id="btn-logout" class="nav-item">
+            <i class="fa-solid fa-right-from-bracket"></i> Đăng xuất
+        </a>
+
+      </nav>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="main-content">
+      <header class="page-header">
+        <h1>Trang chủ</h1>
+        <div class="user-info" id="user-info"></div>
+      </header>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <h3>Tổng số lớp</h3>
+          <div class="stat-number" id="total-classes">0</div>
+        </div>
+        <div class="stat-card">
+          <h3>Tổng số học sinh</h3>
+          <div class="stat-number" id="total-students">0</div>
+        </div>
+        <div class="stat-card">
+          <h3>Hoạt động gần đây</h3>
+          <div class="stat-number" id="recent-activities">0</div>
+        </div>
+      </div>
+
+      <div class="content-grid">
+        <div class="content-card">
+          <h3>Lớp học gần đây</h3>
+          <div id="recent-classes" class="content-list"></div>
+        </div>
+        <div class="content-card">
+          <h3>Học sinh mới</h3>
+          <div id="recent-students" class="content-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/particles.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/firebase.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>
