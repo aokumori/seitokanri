@@ -96,6 +96,162 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     }
 
+    // =========================
+    // HÀM THỐNG KÊ MỚI
+    // =========================
+    
+    // Hàm cập nhật thống kê
+    async function updateStatistics(action) {
+      try {
+        const statsRef = db.collection('statistics').doc('system_stats');
+        const statsDoc = await statsRef.get();
+        
+        const updateData = {
+          [action]: firebase.firestore.FieldValue.increment(1),
+          lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        if (statsDoc.exists) {
+          await statsRef.update(updateData);
+        } else {
+          updateData.totalClasses = 0;
+          updateData.totalStudents = 0;
+          updateData.studentsAdded = 0;
+          updateData.studentsEdited = 0;
+          updateData.studentsDeleted = 0;
+          updateData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+          await statsRef.set(updateData);
+        }
+        
+        console.log(`✅ Statistics updated: ${action}`);
+      } catch (error) {
+        console.error('❌ Error updating statistics:', error);
+      }
+    }
+    
+    // Hàm cập nhật lớp mới thêm gần đây
+    async function updateRecentClasses(className) {
+      try {
+        const recentRef = db.collection('recent_data').doc('recent_classes');
+        const recentDoc = await recentRef.get();
+        
+        let recentClasses = [];
+        if (recentDoc.exists) {
+          recentClasses = recentDoc.data().classes || [];
+        }
+        
+        // Thêm lớp mới vào đầu danh sách
+        recentClasses.unshift({
+          name: className,
+          addedAt: new Date().toISOString()
+        });
+        
+        // Giới hạn danh sách 10 lớp gần nhất
+        if (recentClasses.length > 10) {
+          recentClasses = recentClasses.slice(0, 10);
+        }
+        
+        await recentRef.set({
+          classes: recentClasses,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        
+        console.log('✅ Recent classes updated');
+      } catch (error) {
+        console.error('❌ Error updating recent classes:', error);
+      }
+    }
+    
+    // Hàm cập nhật học sinh mới thêm gần đây
+    async function updateRecentStudents(studentName, studentId) {
+      try {
+        const recentRef = db.collection('recent_data').doc('recent_students');
+        const recentDoc = await recentRef.get();
+        
+        let recentStudents = [];
+        if (recentDoc.exists) {
+          recentStudents = recentDoc.data().students || [];
+        }
+        
+        // Thêm học sinh mới vào đầu danh sách
+        recentStudents.unshift({
+          name: studentName,
+          studentId: studentId,
+          addedAt: new Date().toISOString()
+        });
+        
+        // Giới hạn danh sách 20 học sinh gần nhất
+        if (recentStudents.length > 20) {
+          recentStudents = recentStudents.slice(0, 20);
+        }
+        
+        await recentRef.set({
+          students: recentStudents,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        
+        console.log('✅ Recent students updated');
+      } catch (error) {
+        console.error('❌ Error updating recent students:', error);
+      }
+    }
+    
+    // Hàm load và hiển thị thống kê
+    async function loadStatistics() {
+      try {
+        const statsRef = db.collection('statistics').doc('system_stats');
+        const statsDoc = await statsRef.get();
+        
+        if (statsDoc.exists) {
+          const stats = statsDoc.data();
+          
+          // Đếm tổng số lớp
+          const classesSnapshot = await db.collection('classes').get();
+          const totalClasses = classesSnapshot.size;
+          
+          // Đếm tổng số học sinh
+          const studentsSnapshot = await db.collection('students').get();
+          const totalStudents = studentsSnapshot.size;
+          
+          // Cập nhật UI
+          updateStatisticsUI(totalClasses, totalStudents, stats);
+        }
+      } catch (error) {
+        console.error('❌ Error loading statistics:', error);
+      }
+    }
+    
+    // Hàm cập nhật UI thống kê
+    function updateStatisticsUI(totalClasses, totalStudents, stats) {
+      // Cập nhật trên dashboard nếu có
+      const statsElements = {
+        'total-classes': totalClasses,
+        'total-students': totalStudents,
+        'students-added': stats.studentsAdded || 0,
+        'students-edited': stats.studentsEdited || 0,
+        'students-deleted': stats.studentsDeleted || 0
+      };
+      
+      for (const [id, value] of Object.entries(statsElements)) {
+        const element = document.getElementById(id);
+        if (element) {
+          element.textContent = value;
+        }
+      }
+      
+      // Lưu vào localStorage để hiển thị trên các trang khác
+      localStorage.setItem('totalClasses', totalClasses);
+      localStorage.setItem('totalStudents', totalStudents);
+      
+      console.log('📊 Statistics updated:', { totalClasses, totalStudents, stats });
+    }
+    
+    // Hàm xem chi tiết học sinh
+    function viewStudentDetail(studentId) {
+      console.log('👁️ Viewing student detail:', studentId);
+      window.location.href = `student-detail.html?studentId=${studentId}`;
+    }
+
     // Check if required elements exist
     console.log('🔍 Checking required elements:', {
       classesList: !!classesList,
@@ -126,6 +282,9 @@ document.addEventListener('DOMContentLoaded', function () {
           console.log('✅ Classes snapshot:', snapshot.size, 'classes');
           localStorage.setItem('classCount', snapshot.size);
           renderClasses(snapshot);
+          
+          // Load thống kê
+          loadStatistics();
         },
         error: (error) => {
           console.error('❌ Error loading classes:', error);
@@ -431,6 +590,7 @@ document.addEventListener('DOMContentLoaded', function () {
           <p><strong>Giới tính:</strong> ${getGenderText(data.gender)}</p>
         </div>
         <div class="student-actions">
+          <button class="btn-small btn-view view-student" data-id="${studentId}" type="button">Xem</button>
           <button class="btn-small btn-edit edit-student" data-id="${studentId}" type="button">Sửa</button>
           <button class="btn-small btn-delete remove-student" data-id="${studentId}" type="button">Xóa khỏi lớp</button>
         </div>
@@ -449,6 +609,15 @@ document.addEventListener('DOMContentLoaded', function () {
     function attachStudentEventListeners() {
       console.log('🔗 Attaching student event listeners...');
       
+      // View student details
+      classStudentsList.querySelectorAll('.view-student').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const studentId = e.target.dataset.id;
+          console.log('👁️ View student clicked:', studentId);
+          viewStudentDetail(studentId);
+        });
+      });
+
       // Edit student
       classStudentsList.querySelectorAll('.edit-student').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -485,20 +654,26 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     }
 
-    function removeStudentFromClass(studentId) {
+    async function removeStudentFromClass(studentId) {
       if (confirm('Bạn có chắc muốn xóa học sinh này khỏi lớp?')) {
         console.log('🗑️ Removing student from class:', studentId);
         
-        db.collection('students').doc(studentId).update({
-          classId: '',
-          className: ''
-        }).then(() => {
+        try {
+          await db.collection('students').doc(studentId).update({
+            classId: '',
+            className: ''
+          });
+          
           console.log('✅ Student removed from class');
+          
+          // Cập nhật thống kê
+          await updateStatistics('studentsDeleted');
+          
           alert('Đã xóa học sinh khỏi lớp!');
-        }).catch(error => {
+        } catch (error) {
           console.error('❌ Error removing student:', error);
           alert('Lỗi xóa học sinh: ' + error.message);
-        });
+        }
       }
     }
 
@@ -617,6 +792,9 @@ document.addEventListener('DOMContentLoaded', function () {
         
         console.log('✅ Student updated successfully');
         
+        // Cập nhật thống kê
+        await updateStatistics('studentsEdited');
+        
         // Hiển thị thông báo thành công
         alert('Cập nhật học sinh thành công!');
         
@@ -687,14 +865,14 @@ document.addEventListener('DOMContentLoaded', function () {
       try {
         // Lấy giá trị từ form
         const name = document.getElementById('new-stu-name').value.trim();
-        const studentId = document.getElementById('new-stu-id').value.trim();
+        const studentIdInput = document.getElementById('new-stu-id').value.trim();
         const birthdate = document.getElementById('new-stu-birthdate').value;
         const phone = document.getElementById('new-stu-phone').value.trim();
         const email = document.getElementById('new-stu-email').value.trim();
         const gender = document.getElementById('new-stu-gender').value;
 
         console.log('📝 Student form data:', {
-          name, studentId, birthdate, phone, email, gender, currentClassId
+          name, studentId: studentIdInput, birthdate, phone, email, gender, currentClassId
         });
 
         if (!name) {
@@ -717,7 +895,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const classData = classDoc.data();
         const studentData = {
           name: name,
-          studentId: studentId,
+          studentId: studentIdInput,
           birthdate: birthdate,
           phone: phone,
           email: email,
@@ -746,9 +924,15 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         // Lưu học sinh vào Firestore
-        await db.collection('students').add(studentData);
+        const docRef = await db.collection('students').add(studentData);
         
-        console.log('✅ Student added successfully');
+        console.log('✅ Student added successfully, ID:', docRef.id);
+        
+        // Cập nhật thống kê
+        await updateStatistics('studentsAdded');
+        
+        // Cập nhật học sinh mới thêm gần đây
+        await updateRecentStudents(name, studentIdInput);
         
         // Hiển thị thông báo thành công
         alert('Thêm học sinh thành công!');
@@ -796,7 +980,7 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     }
 
-    function saveClass() {
+    async function saveClass() {
       console.log('💾 Saving class...');
       
       // Disable button để tránh double click
@@ -824,62 +1008,62 @@ document.addEventListener('DOMContentLoaded', function () {
 
       hideModal('class-modal');
 
-      if (editingClassId) {
-        console.log('✏️ Updating existing class:', editingClassId);
-        db.collection('classes').doc(editingClassId).update(classData)
-          .then(() => {
-            alert('Cập nhật lớp thành công!');
-          })
-          .catch(error => {
-            console.error('❌ Error updating class:', error);
-            alert('Lỗi cập nhật: ' + error.message);
-          })
-          .finally(() => {
-            saveClassBtn.textContent = originalText;
-            saveClassBtn.disabled = false;
-          });
-      } else {
-        console.log('➕ Adding new class');
-        classData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-        db.collection('classes').add(classData)
-          .then(() => {
-            alert('Thêm lớp thành công!');
-          })
-          .catch(error => {
-            console.error('❌ Error adding class:', error);
-            alert('Lỗi thêm lớp: ' + error.message);
-          })
-          .finally(() => {
-            saveClassBtn.textContent = originalText;
-            saveClassBtn.disabled = false;
-          });
+      try {
+        if (editingClassId) {
+          console.log('✏️ Updating existing class:', editingClassId);
+          await db.collection('classes').doc(editingClassId).update(classData);
+          
+          alert('Cập nhật lớp thành công!');
+        } else {
+          console.log('➕ Adding new class');
+          classData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+          await db.collection('classes').add(classData);
+          
+          // Cập nhật lớp mới thêm gần đây
+          await updateRecentClasses(name);
+          
+          alert('Thêm lớp thành công!');
+        }
+        
+        // Reload statistics
+        await loadStatistics();
+        
+      } catch (error) {
+        console.error('❌ Error saving class:', error);
+        alert('Lỗi thêm lớp: ' + error.message);
+      } finally {
+        saveClassBtn.textContent = originalText;
+        saveClassBtn.disabled = false;
       }
     }
 
-    function deleteClass(classId) {
+    async function deleteClass(classId) {
       console.log('🗑️ Deleting class:', classId);
       
       if (!confirm('Bạn có chắc muốn xóa lớp này? Học sinh trong lớp sẽ bị xóa khỏi lớp.')) return;
 
-      db.collection('students')
-        .where('classId', '==', classId)
-        .get()
-        .then(snapshot => {
-          const batch = db.batch();
-          snapshot.forEach(doc => {
-            batch.update(doc.ref, { classId: '', className: '' });
-          });
-          return batch.commit();
-        })
-        .then(() => db.collection('classes').doc(classId).delete())
-        .then(() => {
-          console.log('✅ Class deleted successfully');
-          alert('Xóa lớp thành công!');
-        })
-        .catch(error => {
-          console.error('❌ Error deleting class:', error);
-          alert('Lỗi xóa lớp: ' + error.message);
+      try {
+        // Remove students from class
+        const snapshot = await db.collection('students').where('classId', '==', classId).get();
+        const batch = db.batch();
+        snapshot.forEach(doc => {
+          batch.update(doc.ref, { classId: '', className: '' });
         });
+        await batch.commit();
+        
+        // Delete class
+        await db.collection('classes').doc(classId).delete();
+        
+        console.log('✅ Class deleted successfully');
+        
+        // Reload statistics
+        await loadStatistics();
+        
+        alert('Xóa lớp thành công!');
+      } catch (error) {
+        console.error('❌ Error deleting class:', error);
+        alert('Lỗi xóa lớp: ' + error.message);
+      }
     }
 
     function showModal(id) {

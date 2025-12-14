@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Student Manager - Chi tiết học sinh</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+
+<body>
+  <div id="particles-js"></div>
+
+  <div class="navbar">
+    <div class="nav-content">
+      <h2>Student Manager System</h2>
+      <nav>
+        <a href="dashboard.html" class="nav-item">
+            <i class="fa-solid fa-house"></i> Trang chủ
+        </a>
+        <a href="classes.html" class="nav-item">
+            <i class="fa-solid fa-book"></i> Lớp học
+        </a>
+        <a href="students.html" class="nav-item">
+            <i class="fa-solid fa-users"></i> Học sinh
+        </a>
+        <a href="#" id="btn-logout" class="nav-item">
+            <i class="fa-solid fa-right-from-bracket"></i> Đăng xuất
+        </a>
+      </nav>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="main-content">
+      <!-- Student Detail View -->
+      <div id="student-detail-view">
+        <header class="page-header">
+          <div class="header-left">
+            <button id="btn-back-to-class" class="btn-secondary">
+              <i class="fa-solid fa-arrow-left"></i> Quay lại
+            </button>
+            <h1 id="student-detail-title">Chi tiết học sinh</h1>
+          </div>
+        </header>
+
+        <div class="student-detail-container">
+          <!-- Student Basic Info -->
+          <div class="student-basic-info glass">
+            <div class="student-photo-section">
+              <div id="student-photo" class="student-detail-photo">
+                <!-- Photo will be loaded here -->
+              </div>
+              <h2 id="student-name">Tên học sinh</h2>
+              <p id="student-code">Mã HS: </p>
+            </div>
+            
+            <div class="student-info-section">
+              <h3>Thông tin cơ bản</h3>
+              <div class="info-grid">
+                <div class="info-item">
+                  <strong>Ngày sinh:</strong>
+                  <span id="student-birthdate">-</span>
+                </div>
+                <div class="info-item">
+                  <strong>Giới tính:</strong>
+                  <span id="student-gender">-</span>
+                </div>
+                <div class="info-item">
+                  <strong>SĐT liên hệ:</strong>
+                  <span id="student-phone">-</span>
+                </div>
+                <div class="info-item">
+                  <strong>Email:</strong>
+                  <span id="student-email">-</span>
+                </div>
+                <div class="info-item">
+                  <strong>Lớp:</strong>
+                  <span id="student-class">-</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabs for different sections -->
+          <div class="tabs-container">
+            <div class="tabs">
+              <button class="tab-btn active" data-tab="achievement">Thành tích</button>
+              <button class="tab-btn" data-tab="conduct">Hạnh kiểm</button>
+              <button class="tab-btn" data-tab="scores">Điểm số</button>
+              <button class="tab-btn" data-tab="notes">Ghi chú</button>
+            </div>
+            
+            <div class="tab-content">
+              <!-- Achievement Tab -->
+              <div id="achievement-tab" class="tab-pane active">
+                <div class="section-header">
+                  <h3>Thành tích học tập</h3>
+                  <button class="btn-primary btn-small" id="btn-add-achievement">
+                    <i class="fa-solid fa-plus"></i> Thêm thành tích
+                  </button>
+                </div>
+                <div id="achievement-list">
+                  <!-- Achievement list will be loaded here -->
+                  <div class="no-data">Chưa có thành tích nào</div>
+                </div>
+              </div>
+              
+              <!-- Conduct Tab -->
+              <div id="conduct-tab" class="tab-pane">
+                <div class="section-header">
+                  <h3>Hạnh kiểm</h3>
+                  <button class="btn-primary btn-small" id="btn-add-conduct">
+                    <i class="fa-solid fa-plus"></i> Thêm đánh giá
+                  </button>
+                </div>
+                <div id="conduct-list">
+                  <!-- Conduct list will be loaded here -->
+                  <div class="no-data">Chưa có đánh giá hạnh kiểm</div>
+                </div>
+              </div>
+              
+              <!-- Scores Tab -->
+              <div id="scores-tab" class="tab-pane">
+                <div class="section-header">
+                  <h3>Điểm số</h3>
+                  <button class="btn-primary btn-small" id="btn-add-score">
+                    <i class="fa-solid fa-plus"></i> Thêm điểm
+                  </button>
+                </div>
+                
+                <!-- Score summary -->
+                <div class="score-summary glass">
+                  <h4>Tổng kết học kỳ</h4>
+                  <div class="summary-grid">
+                    <div class="summary-item">
+                      <strong>Điểm TB:</strong>
+                      <span id="average-score">-</span>
+                    </div>
+                    <div class="summary-item">
+                      <strong>Học lực:</strong>
+                      <span id="academic-rank">-</span>
+                    </div>
+                    <div class="summary-item">
+                      <strong>Xếp loại:</strong>
+                      <span id="classification">-</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Score subjects -->
+                <div class="score-subjects">
+                  <h4>Điểm theo môn</h4>
+                  <div id="subject-scores">
+                    <!-- Subject scores will be loaded here -->
+                    <div class="no-data">Chưa có điểm số nào</div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Notes Tab -->
+              <div id="notes-tab" class="tab-pane">
+                <div class="section-header">
+                  <h3>Ghi chú</h3>
+                  <button class="btn-primary btn-small" id="btn-add-note">
+                    <i class="fa-solid fa-plus"></i> Thêm ghi chú
+                  </button>
+                </div>
+                <div id="notes-list">
+                  <!-- Notes list will be loaded here -->
+                  <div class="no-data">Chưa có ghi chú nào</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for adding achievement -->
+  <div id="add-achievement-modal" class="modal hidden">
+    <div class="modal-content glass">
+      <h3>Thêm thành tích</h3>
+      <input type="text" id="achievement-title" placeholder="Tiêu đề thành tích" class="input-field" required>
+      <textarea id="achievement-description" placeholder="Mô tả chi tiết" class="input-field" rows="4"></textarea>
+      <input type="date" id="achievement-date" class="input-field">
+      <select id="achievement-type" class="input-field">
+        <option value="">Loại thành tích</option>
+        <option value="academic">Học tập</option>
+        <option value="sport">Thể thao</option>
+        <option value="art">Nghệ thuật</option>
+        <option value="community">Hoạt động cộng đồng</option>
+      </select>
+      <div class="modal-actions">
+        <button id="save-achievement" class="btn-primary">Lưu</button>
+        <button id="close-achievement-modal" class="btn-secondary">Hủy</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for adding conduct -->
+  <div id="add-conduct-modal" class="modal hidden">
+    <div class="modal-content glass">
+      <h3>Thêm đánh giá hạnh kiểm</h3>
+      <select id="conduct-type" class="input-field" required>
+        <option value="">Loại đánh giá</option>
+        <option value="good">Tốt</option>
+        <option value="average">Khá</option>
+        <option value="poor">Yếu</option>
+        <option value="warning">Cảnh cáo</option>
+      </select>
+      <textarea id="conduct-description" placeholder="Chi tiết đánh giá" class="input-field" rows="4" required></textarea>
+      <input type="date" id="conduct-date" class="input-field">
+      <div class="modal-actions">
+        <button id="save-conduct" class="btn-primary">Lưu</button>
+        <button id="close-conduct-modal" class="btn-secondary">Hủy</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for adding score -->
+  <div id="add-score-modal" class="modal hidden">
+    <div class="modal-content glass">
+      <h3>Thêm điểm</h3>
+      <select id="score-subject" class="input-field" required>
+        <option value="">Môn học</option>
+        <option value="math">Toán</option>
+        <option value="literature">Ngữ văn</option>
+        <option value="english">Tiếng Anh</option>
+        <option value="physics">Vật lý</option>
+        <option value="chemistry">Hóa học</option>
+        <option value="biology">Sinh học</option>
+        <option value="history">Lịch sử</option>
+        <option value="geography">Địa lý</option>
+      </select>
+      <input type="number" id="score-value" placeholder="Điểm (0-10)" class="input-field" min="0" max="10" step="0.1" required>
+      <select id="score-type" class="input-field" required>
+        <option value="">Loại điểm</option>
+        <option value="15min">15 phút</option>
+        <option value="45min">45 phút</option>
+        <option value="midterm">Giữa kỳ</option>
+        <option value="final">Cuối kỳ</option>
+      </select>
+      <input type="date" id="score-date" class="input-field">
+      <div class="modal-actions">
+        <button id="save-score" class="btn-primary">Lưu</button>
+        <button id="close-score-modal" class="btn-secondary">Hủy</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for adding note -->
+  <div id="add-note-modal" class="modal hidden">
+    <div class="modal-content glass">
+      <h3>Thêm ghi chú</h3>
+      <textarea id="note-content" placeholder="Nội dung ghi chú" class="input-field" rows="6" required></textarea>
+      <input type="date" id="note-date" class="input-field">
+      <div class="modal-actions">
+        <button id="save-note" class="btn-primary">Lưu</button>
+        <button id="close-note-modal" class="btn-secondary">Hủy</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.2/axios.min.js"></script>
+
+  <!-- Firebase Config -->  
+  <script src="js/firebase-config.js"></script>
+  <script src="js/firebase-init.js"></script>
+
+  <script src="js/particles.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/student-detail.js"></script>
+  <script src="js/auth.js"></script>
+</body>
+</html>
