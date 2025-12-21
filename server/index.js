@@ -2,57 +2,112 @@
 // Giữ khóa API và cấu hình nhạy cảm ngoài source code.
 require("dotenv").config();
 
-// Server Express đơn giản dùng để minh họa upload ảnh và
-// chuyển tiếp ảnh lên Cloudinary bằng helper `cloudinary`.
 const express = require("express");
-
-// Middleware Multer (xem server/middleware/multer.js):
-// - Lưu file multipart lên đĩa tạm
-// - Cung cấp thông tin file qua `req.file`.
-const upload = require("./middleware/multer");
-
-// Wrapper client Cloudinary (cấu hình cloud_name/api_key/api_secret
-// lấy từ biến môi trường). Xem server/utils/cloudinary.js để biết chi tiết.
-const cloudinary = require("./utils/cloudinary");
-
-// Bật CORS và phân tích body JSON cho các endpoint API.
 const cors = require("cors");
 
+// Email utility
+const { generateVerificationCode, sendVerificationEmail } = require("./utils/email");
+
+// Optional: Only load these if needed
+let upload = null;
+let cloudinary = null;
+
+try {
+  upload = require("./middleware/multer");
+  cloudinary = require("./utils/cloudinary");
+} catch (err) {
+  console.warn("⚠️ Warning: Could not load upload middleware:", err.message);
+}
+
 const app = express();
-app.use(express.json()); // parse JSON bodies (for other endpoints)
-app.use(cors()); // allow cross-origin requests (adjust in production)
+app.use(express.json());
+app.use(cors());
 
 
 // Route kiểm tra (health)
 app.get("/", (req, res) => {
   // Thông báo đơn giản để biết server đang chạy.
-  res.send("Send post request to /upload to upload image");
+  res.send("✅ Server is running. Use POST request to /send-verification-code or /upload");
 });
 
+// API gửi mã xác nhận qua email
+app.post("/send-verification-code", async (req, res) => {
+  try {
+    console.log('📨 Nhận request gửi email từ client');
+    console.log('Request body:', req.body);
+    
+    const { studentEmail, studentName } = req.body;
 
-// Endpoint upload
-// - Mong đợi multipart/form-data POST với một trường file tên "image".
-// - `upload.single('image')` là middleware multer xử lý file và gán `req.file`.
-// - Sau khi multer lưu file tạm, ta gọi Cloudinary uploader để đẩy file
-//   từ đĩa lên cloud.
-app.post("/upload", upload.single("image"), (req, res) => {
-  // Lưu ý: ở production nên kiểm tra kỹ `req.file` và trả 400 nếu thiếu.
-  cloudinary.uploader.upload(req.file.path, (err, result) => {
-    if (err) {
-      // Ghi log server để debug, trả lỗi chung cho client. Tránh lộ secret.
-      console.log(err);
-      return res.status(500).json({
+    if (!studentEmail || !studentName) {
+      console.error('❌ Thiếu studentEmail hoặc studentName');
+      return res.status(400).json({
         success: false,
-        message: "Error",
+        message: "Email và tên học sinh là bắt buộc"
       });
     }
 
-    // Nếu upload thành công, Cloudinary trả về metadata (url, public_id, ...)
-    // trong `result`. Trả về cho client để lưu URL ảnh.
+    // Tạo mã xác nhận
+    const verificationCode = generateVerificationCode();
+    console.log('🔐 Mã xác nhận được tạo:', verificationCode);
+
+    // Gửi email
+    console.log('📧 Đang gửi email tới:', studentEmail);
+    await sendVerificationEmail(studentEmail, studentName, verificationCode);
+
+    // Trả về mã cho client (lưu trong Firebase)
     res.status(200).json({
       success: true,
-      message: "Uploaded!",
-      data: result,
+      message: "Mã xác nhận đã gửi thành công!",
+      verificationCode: verificationCode // Client sẽ lưu vào Firestore
+    });
+
+  } catch (error) {
+    console.error("❌ Lỗi gửi email:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi gửi email: " + error.message
+    });
+  }
+});
+
+// Endpoint upload
+app.post("/upload", (req, res) => {
+  if (!upload || !cloudinary) {
+    return res.status(503).json({
+      success: false,
+      message: "Upload service not available"
+    });
+  }
+  
+  upload.single("image")(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({
+        success: false,
+        message: "Upload error: " + err.message
+      });
+    }
+    
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "No file provided"
+      });
+    }
+    
+    cloudinary.uploader.upload(req.file.path, (err, result) => {
+      if (err) {
+        console.log(err);
+        return res.status(500).json({
+          success: false,
+          message: "Error",
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Uploaded!",
+        data: result,
+      });
     });
   });
 });

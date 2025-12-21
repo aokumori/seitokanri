@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Email API</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        button { padding: 10px 20px; background: #007bff; color: white; border: none; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        #result { margin-top: 20px; padding: 10px; border: 1px solid #ccc; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>Test Email API</h1>
+    <button onclick="testAPI()">Send Test Email</button>
+    <div id="result"></div>
+
+    <script>
+        async function testAPI() {
+            const result = document.getElementById('result');
+            result.innerHTML = '⏳ Sending...';
+            
+            try {
+                const response = await fetch('http://localhost:3000/send-verification-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        studentEmail: 'ptrungng10@gmail.com',
+                        studentName: 'Test Student'
+                    })
+                });
+
+                const data = await response.json();
+                console.log('Response:', data);
+                
+                if (data.success) {
+                    result.innerHTML = `<div class="success">
+                        ✅ Email sent successfully!<br>
+                        Verification Code: <strong>${data.verificationCode}</strong><br>
+                        Message: ${data.message}
+                    </div>`;
+                } else {
+                    result.innerHTML = `<div class="error">
+                        ❌ Error: ${data.message}
+                    </div>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error">
+                    ❌ Connection Error: ${error.message}<br>
+                    Make sure server is running on http://localhost:3000
+                </div>`;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,19 +1,94 @@
-// Student detail management
+// Student detail management - FIXED VERSION
 document.addEventListener('DOMContentLoaded', function () {
   console.log('🚀 Student Detail DOM Content Loaded');
   
+  // Use Firebase auth only - no localStorage
+  
+  // Nếu không phải học sinh - check Firebase auth
   auth.onAuthStateChanged(user => {
     if (!user) {
       console.log('❌ No user, redirecting to login');
       window.location.href = 'index.html';
       return;
     }
+    
     console.log('✅ User authenticated:', user.uid);
-    initStudentDetail();
+    
+    // Check user role
+    db.collection('users').doc(user.uid).get().then(doc => {
+      if (doc.exists) {
+        const userData = doc.data();
+        initStudentDetail(userData.role);
+      } else {
+        initStudentDetail('teacher');
+      }
+    });
   });
 
-  function initStudentDetail() {
+  // Clean up orphaned students (students with non-existent classId) to prevent duplicate emails
+  async function cleanupOrphanedStudents() {
+    try {
+      console.log('🧹 Cleaning up orphaned students...');
+      
+      // Get all classes
+      const classesSnapshot = await db.collection('classes').get();
+      const validClassIds = new Set();
+      classesSnapshot.forEach(doc => {
+        validClassIds.add(doc.id);
+      });
+      
+      // Get all students
+      const studentsSnapshot = await db.collection('students').get();
+      let orphanedCount = 0;
+      
+      const deletePromises = [];
+      studentsSnapshot.forEach(doc => {
+        const studentData = doc.data();
+        // If student has a classId that doesn't exist in classes, delete it
+        if (studentData.classId && !validClassIds.has(studentData.classId)) {
+          console.log(`🗑️ Deleting orphaned student ${doc.id} (classId: ${studentData.classId} not found)`);
+          deletePromises.push(db.collection('students').doc(doc.id).delete());
+          orphanedCount++;
+        }
+      });
+      
+      if (deletePromises.length > 0) {
+        await Promise.all(deletePromises);
+        console.log(`✅ Cleaned up ${orphanedCount} orphaned students`);
+      }
+    } catch (error) {
+      console.error('❌ Error cleaning up orphaned students:', error);
+    }
+  }
+
+  // Trim navbar for student view - only show logout
+  function trimStudentNavbar() {
+    console.log('🔧 Trimming navbar for student view');
+    
+    // Hide all nav items except logout
+    const navItems = document.querySelectorAll('nav a, nav button, nav li');
+    navItems.forEach(item => {
+      const text = item.textContent.toLowerCase();
+      const id = item.id ? item.id.toLowerCase() : '';
+      
+      // Show logout button/link
+      if (text.includes('đăng xuất') || text.includes('logout') || id.includes('logout')) {
+        item.style.display = 'inline-block';
+      } else {
+        item.style.display = 'none';
+      }
+    });
+    
+    // Make sure logout button is visible
+    const logoutBtn = document.getElementById('btn-logout');
+    if (logoutBtn) {
+      logoutBtn.style.display = 'inline-block';
+    }
+  }
+
+  function initStudentDetail(userRole) {
     console.log('🎯 Initializing student detail management');
+    console.log('👤 User role:', userRole);
     
     // Get student ID from URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -25,7 +100,55 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
     
-    console.log('📝 Loading student details for:', studentId);
+    // Initialize after cleanup
+    async function setupStudentDetail() {
+      try {
+        // Clean up orphaned students first
+        await cleanupOrphanedStudents();
+        console.log('✅ Cleanup complete, proceeding with initialization');
+        
+        // Check if student is trying to view someone else's profile
+        if (userRole === 'student') {
+          const currentUser = auth.currentUser;
+          if (!currentUser) {
+            console.error('❌ No current Firebase user');
+            window.location.href = 'dashboard.html';
+            return;
+          }
+          
+          const userDoc = await db.collection('users').doc(currentUser.uid).get();
+          if (userDoc.exists) {
+            const userData = userDoc.data();
+            // Find student record for this user
+            const studentSnapshot = await db.collection('students').where('email', '==', userData.email).get();
+            if (!studentSnapshot.empty) {
+              const studentDoc = studentSnapshot.docs[0];
+              if (studentId !== studentDoc.id) {
+                console.error('❌ Student can only view their own profile');
+                alert('Bạn chỉ có thể xem thông tin của chính mình!');
+                window.location.href = 'student-detail.html?studentId=' + studentDoc.id;
+                return;
+              }
+            }
+          }
+        }
+        
+        console.log('📝 Loading student details for:', studentId);
+        continueInitialization(studentId);
+      } catch (error) {
+        console.error('❌ Error during setup:', error);
+        alert('Lỗi khởi tạo trang: ' + error.message);
+      }
+    }
+    
+    function continueInitialization(studentId) {
+      console.log('📝 Continuing student detail initialization for:', studentId);
+      
+      // If student, trim navbar to only show logout
+      if (userRole === 'student') {
+        console.log('👨‍🎓 Setting up student view - trimming navbar');
+        trimStudentNavbar();
+      }
     
     // Elements
     const btnBack = document.getElementById('btn-back-to-class');
@@ -173,8 +296,16 @@ document.addEventListener('DOMContentLoaded', function () {
             const data = doc.data();
             console.log('📋 Student data loaded:', data);
             
-            // Update UI
-            studentName.textContent = data.name;
+            // Update user info in navbar
+            if (userRole === 'student') {
+              const userInfo = document.getElementById('user-info');
+              if (userInfo && data.name) {
+                userInfo.innerHTML = `<i class="fa-solid fa-user"></i> ${data.name}`;
+              }
+            }
+            
+            // Update UI - FIXED: Ensure all fields are properly set
+            studentName.textContent = data.name || 'Chưa có tên';
             studentCode.textContent = `Mã HS: ${data.studentId || 'Chưa có'}`;
             studentBirthdate.textContent = data.birthdate || 'Chưa cập nhật';
             studentGender.textContent = getGenderText(data.gender);
@@ -183,13 +314,13 @@ document.addEventListener('DOMContentLoaded', function () {
             studentClass.textContent = data.className || 'Chưa có lớp';
             
             // Update page title
-            document.getElementById('student-detail-title').textContent = data.name;
+            document.getElementById('student-detail-title').textContent = data.name || 'Chi tiết học sinh';
             
-            // Update photo
+            // Update photo - FIXED: Properly handle photo display
             if (data.photoURL) {
-              studentPhoto.innerHTML = `<img src="${data.photoURL}" alt="${data.name}">`;
+              studentPhoto.innerHTML = `<img src="${data.photoURL}" alt="${data.name}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
             } else {
-              studentPhoto.innerHTML = '<div class="no-photo">📷</div>';
+              studentPhoto.innerHTML = '<div class="no-photo" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#667eea,#764ba2);color:white;font-size:60px;border-radius:50%;">📷</div>';
             }
             
             // Load additional data for active tab
@@ -234,7 +365,6 @@ document.addEventListener('DOMContentLoaded', function () {
       
       db.collection('student_achievements')
         .where('studentId', '==', currentStudentId)
-        .orderBy('date', 'desc')
         .get()
         .then(snapshot => {
           achievementList.innerHTML = '';
@@ -244,20 +374,35 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
           }
           
+          // Sort client-side instead of server-side
+          let achievements = [];
           snapshot.forEach(doc => {
-            const data = doc.data();
+            achievements.push({ id: doc.id, ...doc.data() });
+          });
+          
+          achievements.sort((a, b) => {
+            const dateA = new Date(a.date || 0);
+            const dateB = new Date(b.date || 0);
+            return dateB - dateA;
+          });
+          
+          achievements.forEach(data => {
             const achievementElement = document.createElement('div');
             achievementElement.className = 'achievement-item glass';
+            const subjectText = getSubjectText(data.subject);
+            const coefficientText = `Hệ số ${data.coefficient || 1}`;
+            
             achievementElement.innerHTML = `
               <div class="achievement-header">
-                <h4>${data.title}</h4>
+                <h4 style="color:#2c5530;">${subjectText}: ${data.score}/10</h4>
                 <span class="achievement-date">${formatDate(data.date)}</span>
               </div>
-              <div class="achievement-type">${getAchievementTypeText(data.type)}</div>
-              <p>${data.description || ''}</p>
+              <div class="achievement-type" style="background:rgba(44,85,48,0.2);color:#2c5530;padding:4px 12px;border-radius:20px;font-size:14px;margin-bottom:15px;display:inline-block;">
+                ${coefficientText}
+              </div>
               <div class="achievement-actions">
-                <button class="btn-small btn-edit edit-achievement" data-id="${doc.id}" type="button">Sửa</button>
-                <button class="btn-small btn-delete delete-achievement" data-id="${doc.id}" type="button">Xóa</button>
+                <button class="btn-small btn-edit edit-achievement" data-id="${data.id}" type="button">Sửa</button>
+                <button class="btn-small btn-delete delete-achievement" data-id="${data.id}" type="button">Xóa</button>
               </div>
             `;
             achievementList.appendChild(achievementElement);
@@ -283,7 +428,7 @@ document.addEventListener('DOMContentLoaded', function () {
         })
         .catch(error => {
           console.error('❌ Error loading achievements:', error);
-          achievementList.innerHTML = '<div class="error">Lỗi tải thành tích</div>';
+          achievementList.innerHTML = '<div class="error">Lỗi tải thành tích: ' + error.message + '</div>';
         });
     }
     
@@ -296,7 +441,6 @@ document.addEventListener('DOMContentLoaded', function () {
       
       db.collection('student_conduct')
         .where('studentId', '==', currentStudentId)
-        .orderBy('date', 'desc')
         .get()
         .then(snapshot => {
           conductList.innerHTML = '';
@@ -306,19 +450,30 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
           }
           
+          // Sort client-side
+          let conducts = [];
           snapshot.forEach(doc => {
-            const data = doc.data();
+            conducts.push({ id: doc.id, ...doc.data() });
+          });
+          
+          conducts.sort((a, b) => {
+            const dateA = new Date(a.date || 0);
+            const dateB = new Date(b.date || 0);
+            return dateB - dateA;
+          });
+          
+          conducts.forEach(data => {
             const conductElement = document.createElement('div');
             conductElement.className = 'conduct-item glass';
             conductElement.innerHTML = `
               <div class="conduct-header">
-                <h4>${getConductTypeText(data.type)}</h4>
+                <h4 style="color:#2c5530;">${getConductTypeText(data.type)}</h4>
                 <span class="conduct-date">${formatDate(data.date)}</span>
               </div>
-              <p>${data.description || ''}</p>
+              <p style="color:#2c5530;">${data.description || ''}</p>
               <div class="conduct-actions">
-                <button class="btn-small btn-edit edit-conduct" data-id="${doc.id}" type="button">Sửa</button>
-                <button class="btn-small btn-delete delete-conduct" data-id="${doc.id}" type="button">Xóa</button>
+                <button class="btn-small btn-edit edit-conduct" data-id="${data.id}" type="button">Sửa</button>
+                <button class="btn-small btn-delete delete-conduct" data-id="${data.id}" type="button">Xóa</button>
               </div>
             `;
             conductList.appendChild(conductElement);
@@ -326,7 +481,7 @@ document.addEventListener('DOMContentLoaded', function () {
         })
         .catch(error => {
           console.error('❌ Error loading conduct:', error);
-          conductList.innerHTML = '<div class="error">Lỗi tải hạnh kiểm</div>';
+          conductList.innerHTML = '<div class="error">Lỗi tải hạnh kiểm: ' + error.message + '</div>';
         });
     }
     
@@ -337,7 +492,7 @@ document.addEventListener('DOMContentLoaded', function () {
       
       subjectScores.innerHTML = '<div class="loading">Đang tải điểm số...</div>';
       
-      db.collection('student_scores')
+      db.collection('student_achievements')
         .where('studentId', '==', currentStudentId)
         .get()
         .then(snapshot => {
@@ -368,51 +523,44 @@ document.addEventListener('DOMContentLoaded', function () {
             const subjectElement = document.createElement('div');
             subjectElement.className = 'subject-scores glass';
             
-            // Calculate subject average
-            const subjectAverage = calculateAverage(subjectScoresList.map(s => s.value));
+            // Calculate weighted subject average
+            const subjectAverage = calculateWeightedAverage(subjectScoresList);
             
             let scoresHTML = '';
             subjectScoresList.forEach(score => {
+              const weighting = score.coefficient || 1;
               scoresHTML += `
-                <div class="score-item">
-                  <span>${getScoreTypeText(score.type)}</span>
-                  <span class="score-value">${score.value}</span>
-                  <span class="score-date">${formatDate(score.date)}</span>
+                <div class="score-item" style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:rgba(255,255,255,0.03);border-radius:8px;margin-bottom:8px;">
+                  <span style="color:#2c5530;">${getSubjectText(score.subject)} (${score.score}/10)</span>
+                  <span class="score-value" style="font-weight:600;font-size:18px;color:#2c5530;">x${weighting}</span>
+                  <span class="score-date" style="color:#2c5530;">${formatDate(score.date)}</span>
                 </div>
               `;
             });
             
             subjectElement.innerHTML = `
               <div class="subject-header">
-                <h4>${getSubjectText(subject)}</h4>
-                <span class="subject-average">ĐTB: ${subjectAverage.toFixed(1)}</span>
+                <h4 style="color:#2c5530;">${getSubjectText(subject)}</h4>
+                <span class="subject-average" style="color:#2c5530;">ĐTB: ${subjectAverage.toFixed(1)}</span>
               </div>
               <div class="scores-list">
                 ${scoresHTML}
-              </div>
-              <div class="subject-actions">
-                <button class="btn-small btn-add add-subject-score" data-subject="${subject}" type="button">Thêm điểm</button>
               </div>
             `;
             
             subjectScores.appendChild(subjectElement);
           }
           
-          // Update summary
+          // Update summary with calculations
           updateScoreSummary(scores);
           
-          // Attach event listeners for add score buttons
-          subjectScores.querySelectorAll('.add-subject-score').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-              const subject = e.target.dataset.subject;
-              document.getElementById('score-subject').value = subject;
-              showModal('add-score-modal');
-            });
-          });
+          // Setup charts
+          setupCharts(scores);
         })
         .catch(error => {
           console.error('❌ Error loading scores:', error);
-          subjectScores.innerHTML = '<div class="error">Lỗi tải điểm số</div>';
+          subjectScores.innerHTML = '<div class="error">Lỗi tải điểm số: ' + error.message + '</div>';
+          updateScoreSummary([]);
         });
     }
     
@@ -425,7 +573,6 @@ document.addEventListener('DOMContentLoaded', function () {
       
       db.collection('student_notes')
         .where('studentId', '==', currentStudentId)
-        .orderBy('date', 'desc')
         .get()
         .then(snapshot => {
           notesList.innerHTML = '';
@@ -435,28 +582,49 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
           }
           
+          // Sort client-side
+          let notes = [];
           snapshot.forEach(doc => {
-            const data = doc.data();
+            notes.push({ id: doc.id, ...doc.data() });
+          });
+          
+          notes.sort((a, b) => {
+            const dateA = new Date(a.date || 0);
+            const dateB = new Date(b.date || 0);
+            return dateB - dateA;
+          });
+          
+          notes.forEach(data => {
             const noteElement = document.createElement('div');
             noteElement.className = 'note-item glass';
             noteElement.innerHTML = `
               <div class="note-content">
-                <p>${data.content}</p>
+                <p style="color:#2c5530;line-height:1.6;font-size:15px;">${data.content}</p>
               </div>
-              <div class="note-footer">
-                <span class="note-date">${formatDate(data.date)}</span>
+              <div class="note-footer" style="display:flex;justify-content:space-between;align-items:center;margin-top:15px;padding-top:15px;border-top:1px solid rgba(44,85,48,0.1);">
+                <span class="note-date" style="color:#2c5530;">${formatDate(data.date)}</span>
                 <div class="note-actions">
-                  <button class="btn-small btn-edit edit-note" data-id="${doc.id}" type="button">Sửa</button>
-                  <button class="btn-small btn-delete delete-note" data-id="${doc.id}" type="button">Xóa</button>
+                  <button class="btn-small btn-edit edit-note" data-id="${data.id}" type="button">Sửa</button>
+                  <button class="btn-small btn-delete delete-note" data-id="${data.id}" type="button">Xóa</button>
                 </div>
               </div>
             `;
             notesList.appendChild(noteElement);
           });
+          
+          // Attach event listeners
+          notesList.querySelectorAll('.delete-note').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+              const noteId = e.target.dataset.id;
+              if (confirm('Bạn có chắc muốn xóa ghi chú này?')) {
+                deleteNote(noteId);
+              }
+            });
+          });
         })
         .catch(error => {
           console.error('❌ Error loading notes:', error);
-          notesList.innerHTML = '<div class="error">Lỗi tải ghi chú</div>';
+          notesList.innerHTML = '<div class="error">Lỗi tải ghi chú: ' + error.message + '</div>';
         });
     }
     
@@ -506,7 +674,10 @@ document.addEventListener('DOMContentLoaded', function () {
         'chemistry': 'Hóa học',
         'biology': 'Sinh học',
         'history': 'Lịch sử',
-        'geography': 'Địa lý'
+        'geography': 'Địa lý',
+        'pe': 'Thể dục',
+        'music': 'Âm nhạc',
+        'art': 'Mỹ thuật'
       };
       return subjects[subject] || subject;
     }
@@ -517,62 +688,269 @@ document.addEventListener('DOMContentLoaded', function () {
       return sum / scores.length;
     }
     
+    function calculateWeightedAverage(scoreList) {
+      if (scoreList.length === 0) return 0;
+      let totalWeighted = 0;
+      let totalWeight = 0;
+      
+      scoreList.forEach(score => {
+        const coefficient = score.coefficient || 1;
+        totalWeighted += score.score * coefficient;
+        totalWeight += coefficient;
+      });
+      
+      return totalWeight === 0 ? 0 : totalWeighted / totalWeight;
+    }
+    
+    function calculateOverallAverage(scores) {
+      if (scores.length === 0) return 0;
+      
+      // Group by subject
+      const bySubject = {};
+      scores.forEach(score => {
+        if (!bySubject[score.subject]) {
+          bySubject[score.subject] = [];
+        }
+        bySubject[score.subject].push(score);
+      });
+      
+      // Calculate weighted average for each subject
+      let totalAverage = 0;
+      let subjectCount = 0;
+      
+      for (const [subject, scoreList] of Object.entries(bySubject)) {
+        const avg = calculateWeightedAverage(scoreList);
+        totalAverage += avg;
+        subjectCount++;
+      }
+      
+      return subjectCount === 0 ? 0 : totalAverage / subjectCount;
+    }
+    
+    function getAcademicRank(average) {
+      if (average >= 8.5) return 'Tốt';
+      if (average >= 7) return 'Khá';
+      if (average >= 5) return 'Đạt';
+      return 'Trung bình';
+    }
+    
+    function getClassification(average) {
+      if (average >= 9) return 'Xuất sắc';
+      if (average >= 8) return 'Giỏi';
+      if (average >= 7) return 'Tiên tiến';
+      if (average >= 6) return 'Khá';
+      return 'Trung bình';
+    }
+    
     function updateScoreSummary(scores) {
+      const averageScoreEl = document.getElementById('average-score');
+      const academicRankEl = document.getElementById('academic-rank');
+      const classificationEl = document.getElementById('classification');
+      
       if (scores.length === 0) {
-        document.getElementById('average-score').textContent = '-';
-        document.getElementById('academic-rank').textContent = '-';
-        document.getElementById('classification').textContent = '-';
+        averageScoreEl.textContent = '-';
+        academicRankEl.textContent = '-';
+        classificationEl.textContent = '-';
         return;
       }
       
-      const average = calculateAverage(scores.map(s => s.value));
-      document.getElementById('average-score').textContent = average.toFixed(1);
+      const overallAverage = calculateOverallAverage(scores);
+      const academicRank = getAcademicRank(overallAverage);
+      const classification = getClassification(overallAverage);
       
-      // Determine academic rank
-      let rank = '';
-      let classification = '';
+      averageScoreEl.textContent = overallAverage.toFixed(1);
+      averageScoreEl.style.color = '#2c5530';
       
-      if (average >= 8.0) {
-        rank = 'Giỏi';
-        classification = 'Xuất sắc';
-      } else if (average >= 6.5) {
-        rank = 'Khá';
-        classification = 'Tốt';
-      } else if (average >= 5.0) {
-        rank = 'Trung bình';
-        classification = 'Đạt';
-      } else {
-        rank = 'Yếu';
-        classification = 'Cần cố gắng';
+      academicRankEl.textContent = academicRank;
+      academicRankEl.style.color = '#2c5530';
+      classificationEl.textContent = classification;
+      classificationEl.style.color = '#2c5530';
+    }
+    
+    let lineChart = null;
+    let scoreDistChart = null;
+    
+    function setupCharts(scores) {
+      // Setup chart type buttons
+      const chartBtns = document.querySelectorAll('.chart-type-btn');
+      chartBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          chartBtns.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          
+          const chartType = btn.dataset.chart;
+          document.getElementById('line-chart-container').style.display = chartType === 'line' ? 'block' : 'none';
+          document.getElementById('score-dist-chart-container').style.display = chartType === 'line' ? 'none' : 'block';
+          
+          if (chartType === 'line') {
+            drawLineChart(scores);
+          } else if (chartType === 'score-pie') {
+            drawScoreDistChart(scores, 'doughnut');
+          } else if (chartType === 'score-bar') {
+            drawScoreDistChart(scores, 'bar');
+          }
+        });
+      });
+      
+      // Draw initial line chart
+      drawLineChart(scores);
+    }
+    
+    function drawLineChart(scores) {
+      if (scores.length === 0) return;
+      
+      // Sort scores by date
+      const sortedScores = [...scores].sort((a, b) => {
+        const dateA = new Date(a.date || 0);
+        const dateB = new Date(b.date || 0);
+        return dateA - dateB;
+      });
+      
+      // Prepare data
+      const labels = sortedScores.map(s => formatDate(s.date)).slice(-10);
+      const scoreData = sortedScores.map(s => s.score).slice(-10);
+      
+      const ctx = document.getElementById('lineChart');
+      if (!ctx) return;
+      
+      if (lineChart) lineChart.destroy();
+      
+      lineChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Điểm',
+            data: scoreData,
+            borderColor: '#2c5530',
+            backgroundColor: 'rgba(44,85,48,0.1)',
+            tension: 0.3,
+            fill: true,
+            pointRadius: 5,
+            pointBackgroundColor: '#2c5530'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+            legend: {
+              display: true,
+              labels: { color: '#2c5530' }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: 10,
+              ticks: { color: '#2c5530' },
+              grid: { color: 'rgba(44,85,48,0.1)' }
+            },
+            x: {
+              ticks: { color: '#2c5530' },
+              grid: { color: 'rgba(44,85,48,0.1)' }
+            }
+          }
+        }
+      });
+    }
+    
+    function drawScoreDistChart(scores, type) {
+      if (scores.length === 0) return;
+      
+      // Categorize scores
+      const distribution = {
+        'Yếu (<5)': 0,
+        'Trung bình (5-6)': 0,
+        'Khá (7-8)': 0,
+        'Giỏi (9-10)': 0
+      };
+      
+      scores.forEach(s => {
+        const score = s.score;
+        if (score === undefined || score === null) return;
+        if (score < 5) distribution['Yếu (<5)']++;
+        else if (score < 7) distribution['Trung bình (5-6)']++;
+        else if (score < 9) distribution['Khá (7-8)']++;
+        else distribution['Giỏi (9-10)']++;
+      });
+      
+      const ctx = document.getElementById('scoreDistChart');
+      if (!ctx) return;
+      
+      if (scoreDistChart) scoreDistChart.destroy();
+      
+      const colors = ['#d32f2f', '#ffa726', '#66bb6a', '#42a5f5'];
+      
+      const chartConfig = {
+        type: type,
+        data: {
+          labels: Object.keys(distribution),
+          datasets: [{
+            data: Object.values(distribution),
+            backgroundColor: colors,
+            borderColor: '#fff',
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+            legend: {
+              display: false
+            }
+          }
+        }
+      };
+      
+      // Add scales config for bar chart
+      if (type === 'bar') {
+        chartConfig.options.scales = {
+          y: {
+            beginAtZero: true,
+            ticks: { color: '#2c5530' },
+            grid: { color: 'rgba(44,85,48,0.1)' }
+          },
+          x: {
+            ticks: { color: '#2c5530' },
+            grid: { color: 'rgba(44,85,48,0.1)' }
+          }
+        };
       }
       
-      document.getElementById('academic-rank').textContent = rank;
-      document.getElementById('classification').textContent = classification;
+      scoreDistChart = new Chart(ctx, chartConfig);
     }
+    
     
     // Save functions
     async function saveAchievement() {
-      const title = document.getElementById('achievement-title').value.trim();
-      const description = document.getElementById('achievement-description').value.trim();
+      const subject = document.getElementById('achievement-subject').value.trim();
+      const score = parseFloat(document.getElementById('achievement-score').value);
+      const coefficient = document.getElementById('achievement-coefficient').value;
       const date = document.getElementById('achievement-date').value;
-      const type = document.getElementById('achievement-type').value;
       
-      if (!title) {
-        alert('Vui lòng nhập tiêu đề thành tích!');
+      if (!subject) {
+        alert('Vui lòng chọn môn học!');
         return;
       }
       
-      if (!type) {
-        alert('Vui lòng chọn loại thành tích!');
+      if (isNaN(score) || score < 0 || score > 10) {
+        alert('Vui lòng nhập điểm hợp lệ (0-10)!');
+        return;
+      }
+      
+      if (!coefficient) {
+        alert('Vui lòng chọn hệ số!');
         return;
       }
       
       try {
         await db.collection('student_achievements').add({
           studentId: currentStudentId,
-          title: title,
-          description: description,
-          type: type,
+          subject: subject,
+          score: score,
+          coefficient: parseInt(coefficient),
           date: date || new Date().toISOString(),
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
@@ -582,10 +960,10 @@ document.addEventListener('DOMContentLoaded', function () {
         loadStudentAchievements();
         
         // Reset form
-        document.getElementById('achievement-title').value = '';
-        document.getElementById('achievement-description').value = '';
+        document.getElementById('achievement-subject').value = '';
+        document.getElementById('achievement-score').value = '';
+        document.getElementById('achievement-coefficient').value = '';
         document.getElementById('achievement-date').value = '';
-        document.getElementById('achievement-type').value = '';
       } catch (error) {
         console.error('❌ Error saving achievement:', error);
         alert('Lỗi thêm thành tích: ' + error.message);
@@ -737,7 +1115,8 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     }
     
-    // Initialize
-    loadStudentInfo();
+    // Call setup
+    setupStudentDetail();
+    }
   }
 });

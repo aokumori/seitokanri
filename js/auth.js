@@ -1,4 +1,6 @@
 // Authentication handling
+let redirectInProgress = false; // Flag to prevent redirect loops
+
 document.addEventListener('DOMContentLoaded', function() {
   // Check if we're on login page
   if (document.getElementById('btn-login')) {
@@ -33,6 +35,13 @@ document.addEventListener('DOMContentLoaded', function() {
       }
 
       try {
+        // Check if email already exists in student list
+        const existingStudent = await db.collection('students').where('email', '==', email).get();
+        if (!existingStudent.empty) {
+          alert('Email này đã tồn tại trong danh sách học sinh!');
+          return;
+        }
+
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
 
@@ -43,6 +52,18 @@ document.addEventListener('DOMContentLoaded', function() {
           role: role,
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
+
+        // If student role, create or update student record
+        if (role === 'student') {
+          // Create new student record
+          await db.collection('students').add({
+            name: name,
+            email: email,
+            userId: user.uid,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          console.log('✅ Student record created');
+        }
 
         window.location.href = 'dashboard.html';
       } catch (error) {
@@ -56,10 +77,70 @@ document.addEventListener('DOMContentLoaded', function() {
       const password = document.getElementById('login-password').value;
 
       try {
-        await auth.signInWithEmailAndPassword(email, password);
-        window.location.href = 'dashboard.html';
+        // Kiểm tra xem email có phải học sinh không
+        const studentSnapshot = await db.collection('students').where('email', '==', email).get();
+
+        if (!studentSnapshot.empty) {
+          // Đây là học sinh - kiểm tra mã xác nhận thay vì password
+          const studentDoc = studentSnapshot.docs[0];
+          const studentData = studentDoc.data();
+          const verificationCode = studentData.verificationCode;
+
+          if (!verificationCode) {
+            alert('❌ Lỗi: Tài khoản chưa được kích hoạt. Vui lòng liên hệ giáo viên.');
+            return;
+          }
+
+          if (password !== verificationCode) {
+            alert('❌ Mã xác nhận không đúng. Vui lòng kiểm tra email của bạn.');
+            return;
+          }
+
+          // Mã xác nhận đúng - đăng nhập Firebase
+          console.log('✅ Mã xác nhận đúng, đang đăng nhập học sinh:', email);
+          
+          try {
+            // Tạo hoặc đăng nhập Firebase user
+            let authUser = null;
+            try {
+              // Thử đăng nhập trước
+              const result = await auth.signInWithEmailAndPassword(email, password);
+              authUser = result.user;
+            } catch (signInError) {
+              // Nếu user không tồn tại, tạo mới
+              if (signInError.code === 'auth/user-not-found') {
+                const result = await auth.createUserWithEmailAndPassword(email, password);
+                authUser = result.user;
+              } else {
+                throw signInError;
+              }
+            }
+            
+            // Tạo user doc trong users collection với role='student'
+            await db.collection('users').doc(authUser.uid).set({
+              email: email,
+              name: studentData.name,
+              role: 'student',
+              studentId: studentDoc.id,
+              createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+            
+            console.log('✅ Đăng nhập học sinh thành công');
+            window.location.href = `student-detail.html?studentId=${studentDoc.id}`;
+          } catch (error) {
+            console.error('❌ Lỗi đăng nhập Firebase:', error);
+            alert('❌ Lỗi đăng nhập: ' + error.message);
+          }
+          return;
+        } else {
+          // Đây là giáo viên - đăng nhập bình thường
+          await auth.signInWithEmailAndPassword(email, password);
+          
+          window.location.href = 'dashboard.html';
+        }
       } catch (error) {
-        alert('Lỗi đăng nhập: ' + error.message);
+        console.error('Lỗi đăng nhập:', error);
+        alert('❌ Lỗi đăng nhập: ' + error.message);
       }
     });
   }
@@ -69,7 +150,11 @@ document.addEventListener('DOMContentLoaded', function() {
   logoutButtons.forEach(button => {
     if (button) {
       button.addEventListener('click', function() {
+        // Đăng xuất Firebase
         auth.signOut().then(() => {
+          window.location.href = 'index.html';
+        }).catch(() => {
+          // Nếu lỗi Firebase (e.g. student không có Firebase auth), vẫn chuyển về login
           window.location.href = 'index.html';
         });
       });
@@ -78,23 +163,70 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Auth state observer
   auth.onAuthStateChanged(user => {
-    const currentPage = window.location.pathname.split('/').pop();
+    // Tránh redirect lặp lại
+    if (redirectInProgress) {
+      console.log('⏳ Redirect already in progress, skipping...');
+      return;
+    }
     
-    if (user && currentPage === 'index.html') {
+    // Parse current page - handle full paths
+    const fullPath = window.location.pathname;
+    let currentPage = fullPath.split('/').pop();
+    if (!currentPage || currentPage === '') {
+      currentPage = 'index.html';
+    }
+    
+    console.log('📍 Full path:', fullPath);
+    console.log('📄 Current page:', currentPage);
+    
+    // Chỉ check Firebase auth - không dùng localStorage
+    const isLoggedIn = !!user;
+    
+    console.log('🔐 Auth check:', {
+      user: !!user,
+      isLoggedIn,
+      currentPage
+    });
+    
+    // LOGIC: Redirect nếu cần thiết
+    const isIndexPage = currentPage === 'index.html' || currentPage === '';
+    const isDashboardPage = currentPage.includes('dashboard') || currentPage.includes('classes') || currentPage.includes('students') || currentPage.includes('activities');
+    
+    if (isLoggedIn && isIndexPage) {
+      // ✅ Đã đăng nhập nhưng ở login page → chuyển dashboard
+      console.log('✅ Logged in on login page, redirecting to dashboard...');
+      redirectInProgress = true;
       window.location.href = 'dashboard.html';
-    } else if (!user && currentPage !== 'index.html') {
+      return;
+    } 
+    
+    if (!isLoggedIn && !isIndexPage) {
+      // ❌ Chưa đăng nhập nhưng ở page khác login → chuyển login
+      console.log('❌ Not logged in on protected page, redirecting to login...');
+      redirectInProgress = true;
       window.location.href = 'index.html';
-    } else if (user && currentPage !== 'index.html') {
-      // Load user info
-      db.collection('users').doc(user.uid).get().then(doc => {
-        if (doc.exists) {
-          const userData = doc.data();
-          const userInfoEl = document.getElementById('user-info');
-          if (userInfoEl) {
-            userInfoEl.textContent = `${userData.name} (${userData.role === 'admin' ? 'Quản trị' : 'Giáo viên'})`;
+      return;
+    }
+    
+    if (isLoggedIn && isDashboardPage) {
+      // ✅ Đã đăng nhập ở dashboard → load thông tin
+      console.log('✅ Logged in, displaying user info...');
+      
+      if (user) {
+        db.collection('users').doc(user.uid).get().then(doc => {
+          if (doc.exists) {
+            const userData = doc.data();
+            const userInfoEl = document.getElementById('user-info');
+            if (userInfoEl) {
+              let roleText = 'Giáo viên';
+              if (userData.role === 'admin') roleText = 'Quản trị';
+              else if (userData.role === 'student') roleText = 'Học sinh';
+              userInfoEl.textContent = `${userData.name} (${roleText})`;
+            }
+            console.log('👨‍🏫 User:', userData.name);
           }
-        }
-      });
+        });
+      }
     }
   });
 });

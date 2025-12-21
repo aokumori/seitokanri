@@ -13,11 +13,23 @@ if (!window.firebase) {
     // Expose commonly used services
     try {
       window.db = window.firebase.firestore();
-      window.storage = window.firebase.storage();
-      window.auth = window.firebase.auth && window.firebase.auth();
-      console.log('Firestore, Storage and Auth are available on window.db/window.storage/window.auth');
+      console.log('Firestore is available on window.db');
     } catch (e) {
-      console.warn('Could not initialize some Firebase services (maybe not included):', e);
+      console.warn('Firestore not available:', e);
+    }
+    
+    try {
+      window.auth = window.firebase.auth();
+      console.log('Auth is available on window.auth');
+    } catch (e) {
+      console.warn('Auth not available:', e);
+    }
+    
+    try {
+      window.storage = window.firebase.storage();
+      console.log('Storage is available on window.storage');
+    } catch (e) {
+      console.warn('Storage not available:', e);
     }
   } catch (err) {
     console.error('Error initializing Firebase:', err);

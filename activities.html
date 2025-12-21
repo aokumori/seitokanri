@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Student Manager - Hoạt động gần đây</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+  <!-- Particles Background -->
+  <div id="particles-js"></div>
+
+  <div class="navbar">
+    <div class="nav-content">
+      <h2>Student Manager System</h2>
+      <nav>
+        <a href="dashboard.html" class="nav-item">
+            <i class="fa-solid fa-house"></i> Trang chủ
+        </a>
+
+        <a href="classes.html" class="nav-item">
+            <i class="fa-solid fa-book"></i> Lớp học
+        </a>
+
+        <a href="activities.html" class="nav-item active">
+            <i class="fa-solid fa-history"></i> Hoạt động
+        </a>
+
+        <a href="#" id="btn-logout" class="nav-item">
+            <i class="fa-solid fa-right-from-bracket"></i> Đăng xuất
+        </a>
+      </nav>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="main-content">
+      <header class="page-header">
+        <h1>Hoạt động gần đây</h1>
+        <div class="user-info" id="user-info">
+          <i class="fa-solid fa-user"></i> Đang tải...
+        </div>
+      </header>
+
+      <!-- Activities List -->
+      <div class="content-card glass">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-history"></i> Nhật ký hoạt động (7 ngày qua)</h3>
+        </div>
+        <div id="activities-list" class="content-list">
+          <div class="loading">Đang tải hoạt động...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/particles.js"></script>
+  <script src="js/app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+  
+  <!-- Firebase Config -->  
+  <script src="js/firebase-config.js"></script>
+  <script src="js/firebase-init.js"></script>
+  
+  <script src="js/auth.js"></script>
+  <script src="js/activities.js"></script>
+</body>
+</html>
