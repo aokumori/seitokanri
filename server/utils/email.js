@@ -1,11 +1,18 @@
 const nodemailer = require('nodemailer');
 
+const gmailUser = process.env.GMAIL_USER || 'noreplytenkiyohou@gmail.com';
+const gmailAppPassword = process.env.GMAIL_APP_PASSWORD;
+
+if (!gmailAppPassword) {
+  console.warn('⚠️ GMAIL_APP_PASSWORD is missing. Email sending will fail until it is set in server/.env and the server is restarted.');
+}
+
 // Cấu hình email
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: 'noreplytenkiyohou@gmail.com',
-    pass: 'nedr jnfa vnyt qpym' // App password
+    user: gmailUser,
+    pass: gmailAppPassword
   },
   tls: {
     rejectUnauthorized: false
@@ -30,7 +37,7 @@ function generateVerificationCode() {
 async function sendVerificationEmail(studentEmail, studentName, verificationCode) {
   try {
     const mailOptions = {
-      from: 'noreplytenkiyohou@gmail.com',
+      from: gmailUser,
       to: studentEmail,
       subject: 'Mã xác nhận đăng nhập tài khoản học sinh',
       html: `

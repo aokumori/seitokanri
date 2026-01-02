@@ -1129,3 +1129,23 @@ body {
     gap: 10px;
   }
 }
+:root {
+  --primary-color: #4CAF50;     /* Màu chủ đạo xanh lá */
+  --secondary-color: #2196F3;   /* Màu phụ xanh dương */
+  --success-color: #4CAF50;     /* Màu thành công */
+  --warning-color: #FF9800;     /* Màu cảnh báo */
+  --danger-color: #F44336;      /* Màu nguy hiểm */
+  --info-color: #2196F3;        /* Màu thông tin */
+  --gray-color: #9E9E9E;        /* Màu xám */
+  
+  --text-primary: #333333;      /* Màu chữ chính */
+  --text-secondary: #666666;    /* Màu chữ phụ */
+  --text-rgb: 51, 51, 51;       /* RGB cho text-primary */
+  
+  --card-bg-rgb: 255, 255, 255; /* RGB cho nền card */
+  --border-color-rgb: 0, 0, 0;  /* RGB cho viền */
+  
+  /* Màu gradient cho nền */
+  --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}

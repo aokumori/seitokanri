@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Student Manager - Chi tiết học sinh</title>
+  <title>Hồ sơ học sinh</title>
   <link rel="stylesheet" href="css/main.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
@@ -13,16 +13,16 @@
 
   <div class="navbar">
     <div class="nav-content">
-      <h2>Student Manager System</h2>
+      <h2>Hồ sơ học sinh</h2>
       <nav>
         <a href="dashboard.html" class="nav-item">
-            <i class="fa-solid fa-house"></i> Trang chủ
+            <i class="fa-solid fa-home"></i> Trang chủ
         </a>
         <a href="classes.html" class="nav-item">
-            <i class="fa-solid fa-book"></i> Lớp học
+            <i class="fa-solid fa-chalkboard"></i> Lớp học
         </a>
         <a href="activities.html" class="nav-item">
-            <i class="fa-solid fa-history"></i> Hoạt động
+            <i class="fa-solid fa-chart-line"></i> Hoạt động
         </a>
         <a href="#" id="btn-logout" class="nav-item">
             <i class="fa-solid fa-right-from-bracket"></i> Đăng xuất
@@ -95,9 +95,9 @@
               <!-- Achievement Tab -->
               <div id="achievement-tab" class="tab-pane active">
                 <div class="section-header">
-                  <h3>Thành tích học tập</h3>
+                  <h3>Thành tích học tập (Thêm điểm ở đây)</h3>
                   <button class="btn-primary btn-small" id="btn-add-achievement">
-                    <i class="fa-solid fa-plus"></i> Thêm thành tích
+                    <i class="fa-solid fa-plus"></i> Thêm thành tích/Điểm
                   </button>
                 </div>
                 <div id="achievement-list">
@@ -123,10 +123,8 @@
               <!-- Scores Tab -->
               <div id="scores-tab" class="tab-pane">
                 <div class="section-header">
-                  <h3>Điểm số</h3>
-                  <button class="btn-primary btn-small" id="btn-add-score">
-                    <i class="fa-solid fa-plus"></i> Thêm điểm
-                  </button>
+                  <h3>Điểm số (Tự động từ Thành tích)</h3>
+                  <!-- KHÔNG CÓ NÚT THÊM Ở ĐÂY - ĐIỂM ĐƯỢC THÊM Ở TAB THÀNH TÍCH -->
                 </div>
                 
                 <!-- Score summary -->
@@ -164,13 +162,13 @@
                   <!-- Chart Type Buttons -->
                   <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
                     <button class="btn-small chart-type-btn active" data-chart="line" type="button">
-                      <i class="fa-solid fa-chart-line"></i> Điểm & Hạnh kiểm
+                      <i class="fa-solid fa-chart-line"></i> Đường
                     </button>
                     <button class="btn-small chart-type-btn" data-chart="score-pie" type="button">
-                      <i class="fa-solid fa-chart-pie"></i> Tỉ lệ điểm (Tròn)
+                      <i class="fa-solid fa-chart-pie"></i> Tròn
                     </button>
                     <button class="btn-small chart-type-btn" data-chart="score-bar" type="button">
-                      <i class="fa-solid fa-chart-column"></i> Tỉ lệ điểm (Cột)
+                      <i class="fa-solid fa-chart-column"></i> Cột
                     </button>
                   </div>
                   
@@ -185,22 +183,27 @@
                     <div style="display:flex;gap:20px;margin-bottom:15px;flex-wrap:wrap;justify-content:center;">
                       <div style="display:flex;align-items:center;gap:8px;">
                         <div style="width:16px;height:16px;background:#d32f2f;border-radius:2px;"></div>
-                        <span style="color:#2c5530;font-size:14px;">Yếu (≤5)</span>
+                        <span style="color:#2c5530;font-size:14px;">Yếu (<5)</span>
                       </div>
                       <div style="display:flex;align-items:center;gap:8px;">
                         <div style="width:16px;height:16px;background:#ffa726;border-radius:2px;"></div>
-                        <span style="color:#2c5530;font-size:14px;">Trung bình (5-6)</span>
+                        <span style="color:#2c5530;font-size:14px;">Trung bình (5-6.5)</span>
                       </div>
                       <div style="display:flex;align-items:center;gap:8px;">
                         <div style="width:16px;height:16px;background:#66bb6a;border-radius:2px;"></div>
-                        <span style="color:#2c5530;font-size:14px;">Khá (7-8)</span>
+                        <span style="color:#2c5530;font-size:14px;">Khá (6.5-8)</span>
                       </div>
                       <div style="display:flex;align-items:center;gap:8px;">
                         <div style="width:16px;height:16px;background:#42a5f5;border-radius:2px;"></div>
-                        <span style="color:#2c5530;font-size:14px;">Giỏi (9-10)</span>
+                        <span style="color:#2c5530;font-size:14px;">Giỏi (8-10)</span>
                       </div>
                     </div>
                     <canvas id="scoreDistChart" style="max-height:300px;"></canvas>
+                  </div>
+                  
+                  <!-- Subject Comparison Chart Container -->
+                  <div id="subject-chart-container" style="display:none;margin-bottom:20px;">
+                    <canvas id="subjectChart" style="max-height:300px;"></canvas>
                   </div>
                 </div>
               </div>
@@ -231,17 +234,17 @@
       <h3>Thêm thành tích (Điểm số)</h3>
       <select id="achievement-subject" class="input-field" required>
         <option value="">Môn học</option>
-        <option value="math">Toán</option>
-        <option value="literature">Ngữ văn</option>
-        <option value="english">Tiếng Anh</option>
-        <option value="physics">Vật lý</option>
-        <option value="chemistry">Hóa học</option>
-        <option value="biology">Sinh học</option>
-        <option value="history">Lịch sử</option>
-        <option value="geography">Địa lý</option>
-        <option value="pe">Thể dục</option>
-        <option value="music">Âm nhạc</option>
-        <option value="art">Mỹ thuật</option>
+        <option value="Toán">Toán</option>
+        <option value="Ngữ văn">Ngữ văn</option>
+        <option value="Tiếng Anh">Tiếng Anh</option>
+        <option value="Vật lý">Vật lý</option>
+        <option value="Hóa học">Hóa học</option>
+        <option value="Sinh học">Sinh học</option>
+        <option value="Lịch sử">Lịch sử</option>
+        <option value="Địa lý">Địa lý</option>
+        <option value="Thể dục">Thể dục</option>
+        <option value="Âm nhạc">Âm nhạc</option>
+        <option value="Mỹ thuật">Mỹ thuật</option>
       </select>
       <input type="number" id="achievement-score" placeholder="Điểm (0-10)" class="input-field" min="0" max="10" step="0.1" required>
       <select id="achievement-coefficient" class="input-field" required>
@@ -250,10 +253,10 @@
         <option value="2">Hệ số 2</option>
         <option value="3">Hệ số 3</option>
       </select>
-      <input type="date" id="achievement-date" class="input-field">
+      <input type="date" id="achievement-date" class="input-field" required>
       <div class="modal-actions">
         <button id="save-achievement" class="btn-primary">Lưu</button>
-        <button id="close-achievement-modal" class="btn-secondary">Hủy</button>
+        <button id="close-achievement-modal" class="btn-secondary">Đóng</button>
       </div>
     </div>
   </div>
@@ -270,41 +273,10 @@
         <option value="warning">Cảnh cáo</option>
       </select>
       <textarea id="conduct-description" placeholder="Chi tiết đánh giá" class="input-field" rows="4" required></textarea>
-      <input type="date" id="conduct-date" class="input-field">
+      <input type="date" id="conduct-date" class="input-field" required>
       <div class="modal-actions">
         <button id="save-conduct" class="btn-primary">Lưu</button>
-        <button id="close-conduct-modal" class="btn-secondary">Hủy</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal for adding score -->
-  <div id="add-score-modal" class="modal hidden">
-    <div class="modal-content glass">
-      <h3>Thêm điểm</h3>
-      <select id="score-subject" class="input-field" required>
-        <option value="">Môn học</option>
-        <option value="math">Toán</option>
-        <option value="literature">Ngữ văn</option>
-        <option value="english">Tiếng Anh</option>
-        <option value="physics">Vật lý</option>
-        <option value="chemistry">Hóa học</option>
-        <option value="biology">Sinh học</option>
-        <option value="history">Lịch sử</option>
-        <option value="geography">Địa lý</option>
-      </select>
-      <input type="number" id="score-value" placeholder="Điểm (0-10)" class="input-field" min="0" max="10" step="0.1" required>
-      <select id="score-type" class="input-field" required>
-        <option value="">Loại điểm</option>
-        <option value="15min">15 phút</option>
-        <option value="45min">45 phút</option>
-        <option value="midterm">Giữa kỳ</option>
-        <option value="final">Cuối kỳ</option>
-      </select>
-      <input type="date" id="score-date" class="input-field">
-      <div class="modal-actions">
-        <button id="save-score" class="btn-primary">Lưu</button>
-        <button id="close-score-modal" class="btn-secondary">Hủy</button>
+        <button id="close-conduct-modal" class="btn-secondary">Đóng</button>
       </div>
     </div>
   </div>
@@ -314,10 +286,10 @@
     <div class="modal-content glass">
       <h3>Thêm ghi chú</h3>
       <textarea id="note-content" placeholder="Nội dung ghi chú" class="input-field" rows="6" required></textarea>
-      <input type="date" id="note-date" class="input-field">
+      <input type="date" id="note-date" class="input-field" required>
       <div class="modal-actions">
         <button id="save-note" class="btn-primary">Lưu</button>
-        <button id="close-note-modal" class="btn-secondary">Hủy</button>
+        <button id="close-note-modal" class="btn-secondary">Đóng</button>
       </div>
     </div>
   </div>

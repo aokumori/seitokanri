@@ -7,5 +7,3 @@ window.firebaseConfig = {
   appId: "1:646487165291:web:7a99dfcd1b9cce6bb4e42e",
   measurementId: "G-DYJZJV2PQL"
 };
-
-firebase.initializeApp(window.firebaseConfig);

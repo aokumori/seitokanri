@@ -2,54 +2,52 @@
 document.addEventListener('DOMContentLoaded', function() {
   console.log('🚀 Dashboard DOM Content Loaded');
   
-  // Check authentication
-  auth.onAuthStateChanged(user => {
+  // Function to check user role and redirect if needed
+  const checkUserRoleAndRedirect = async (userId) => {
+    try {
+      const userDoc = await db.collection('users').doc(userId).get();
+      if (userDoc.exists) {
+        const userData = userDoc.data();
+        if (userData.role === 'student') {
+          const studentSnapshot = await db.collection('students')
+            .where('email', '==', userData.email)
+            .get();
+          
+          if (!studentSnapshot.empty) {
+            const studentId = studentSnapshot.docs[0].id;
+            console.log('🔄 Chuyển hướng học sinh đến trang hồ sơ');
+            window.location.href = `student-detail.html?studentId=${studentId}`;
+            return true; // Đã chuyển hướng
+          } else {
+            console.log('❌ Không tìm thấy hồ sơ học sinh');
+            window.location.href = 'index.html';
+            return true;
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Lỗi kiểm tra quyền người dùng:', error);
+    }
+    return false; // Không cần chuyển hướng
+  };
+
+  // Check authentication and role
+  auth.onAuthStateChanged(async (user) => {
     if (!user) {
-      console.log('❌ No user, redirecting to login');
+      console.log('❌ Chưa đăng nhập, chuyển đến trang đăng nhập');
       window.location.href = 'index.html';
       return;
     }
     
-    console.log('✅ User authenticated:', user.uid);
+    console.log('✅ Đã xác thực người dùng:', user.uid);
     
-    // Check user role
-    db.collection('users').doc(user.uid).get().then(doc => {
-      console.log('📋 User doc fetch result:', !!doc.exists);
-      
-      if (doc.exists) {
-        const userData = doc.data();
-        console.log('👨‍🏫 User role:', userData.role);
-        
-        // Redirect students to their own profile
-        if (userData.role === 'student') {
-          db.collection('students').where('email', '==', userData.email).get().then(snapshot => {
-            if (!snapshot.empty) {
-              const studentId = snapshot.docs[0].id;
-              window.location.href = `student-detail.html?studentId=${studentId}`;
-            } else {
-              alert('Không tìm thấy hồ sơ học sinh. Vui lòng liên hệ giáo viên.');
-              window.location.href = 'index.html';
-            }
-          }).catch(err => {
-            console.error('❌ Error finding student:', err);
-            window.location.href = 'index.html';
-          });
-          return;
-        }
-        
-        // Nếu là giáo viên/admin - load dashboard
-        console.log('👨‍🏫 Loading teacher dashboard');
-        loadDashboardContent();
-      } else {
-        console.log('⚠️ User doc not found, loading dashboard anyway');
-        loadDashboardContent();
-      }
-    }).catch(err => {
-      console.error('❌ Error getting user data:', err);
-      // Vẫn load dashboard ngay cả khi lỗi
-      console.log('⚠️ Error loading user, but still loading dashboard');
-      loadDashboardContent();
-    });
+    // Kiểm tra và chuyển hướng nếu cần
+    const wasRedirected = await checkUserRoleAndRedirect(user.uid);
+    if (wasRedirected) return;
+    
+    // Nếu không phải học sinh, tải dashboard
+    console.log('👨\u200d🏫 Tải trang dành cho giáo viên/quản trị viên');
+    loadDashboardContent();
   });
 
   function loadDashboardContent() {

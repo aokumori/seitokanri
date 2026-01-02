@@ -1,6 +1,6 @@
-// Classes management with gender icons and edit student modal
+// Classes management - FIXED VERSION (NO INDEX REQUIRED)
 document.addEventListener('DOMContentLoaded', function () {
-  console.log('🚀 DOM Content Loaded');
+  console.log('🚀 Classes Management Initialized');
   
   auth.onAuthStateChanged(user => {
     if (!user) {
@@ -47,6 +47,9 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
     
+    // ========================================
+    // ELEMENT REFERENCES
+    // ========================================
     const classesList = document.getElementById('classes-list');
     const classStudentsList = document.getElementById('class-students-list');
     const btnAddClass = document.getElementById('btn-add-class');
@@ -56,35 +59,37 @@ document.addEventListener('DOMContentLoaded', function () {
     const closeModalBtn = document.getElementById('close-modal');
     const saveNewStudentBtn = document.getElementById('save-new-student');
     const closeAddStudentModalBtn = document.getElementById('close-add-student-modal');
-    
-    // Edit student modal elements
     const closeEditStudentModalBtn = document.getElementById('close-edit-student-modal');
     const saveEditStudentBtn = document.getElementById('save-edit-student');
 
+    // ========================================
+    // GLOBAL VARIABLES
+    // ========================================
     let editingClassId = null;
     let currentClassId = null;
     let currentPhotoFile = null;
     let classStudentsUnsubscribe = null;
     let editingStudentId = null;
 
-    // ==== CLOUDINARY CONFIGURATION ====
-    // THAY ĐỔI 2 DÒNG NÀY BẰNG THÔNG TIN CỦA BẠN
-    const CLOUDINARY_CLOUD_NAME = 'dlcb3l2ec'; // Thay bằng cloud name của bạn
-    const CLOUDINARY_UPLOAD_PRESET = 'student_photos'; // Thay bằng upload preset của bạn
+    // ========================================
+    // CLOUDINARY CONFIG
+    // ========================================
+    const CLOUDINARY_CLOUD_NAME = 'dlcb3l2ec';
+    const CLOUDINARY_UPLOAD_PRESET = 'student_photos';
 
-    // Hàm upload trực tiếp lên Cloudinary
+    // ========================================
+    // UTILITY FUNCTIONS
+    // ========================================
     async function uploadToCloudinary(file) {
       if (!file) return null;
       
       try {
         console.log('☁️ Uploading to Cloudinary:', file.name);
         
-        // Tạo FormData cho Cloudinary
         const formData = new FormData();
         formData.append('file', file);
         formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
         
-        // Gửi request trực tiếp tới Cloudinary
         const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
           method: 'POST',
           body: formData
@@ -97,8 +102,6 @@ document.addEventListener('DOMContentLoaded', function () {
         
         const data = await response.json();
         console.log('✅ Cloudinary upload successful');
-        
-        // Cloudinary trả về secure_url hoặc url
         return data.secure_url || data.url;
         
       } catch (err) {
@@ -107,7 +110,6 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     }
 
-    // Hàm upload chính - chỉ dùng Cloudinary
     async function uploadImage(file) {
       console.log('📤 Starting image upload...');
       
@@ -116,7 +118,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return null;
       }
       
-      // Chỉ dùng Cloudinary
       const url = await uploadToCloudinary(file);
       
       if (url) {
@@ -128,262 +129,97 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     }
 
-    // =========================
-    // HÀM THỐNG KÊ MỚI
-    // =========================
-    
-    // Hàm cập nhật thống kê
-    async function updateStatistics(action) {
-      try {
-        const statsRef = db.collection('system_stats').doc('current');
-        const statsDoc = await statsRef.get();
-        
-        const updateData = {
-          [action]: firebase.firestore.FieldValue.increment(1),
-          lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-        };
-        
-        if (statsDoc.exists) {
-          await statsRef.update(updateData);
-        } else {
-          updateData.totalClasses = 0;
-          updateData.totalStudents = 0;
-          updateData.studentsAdded = 0;
-          updateData.studentsEdited = 0;
-          updateData.studentsDeleted = 0;
-          updateData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-          await statsRef.set(updateData);
-        }
-        
-        console.log(`✅ Statistics updated: ${action}`);
-      } catch (error) {
-        console.error('❌ Error updating statistics:', error);
-      }
-    }
-    
-    // Hàm cập nhật số lượng tổng
-    async function updateCount(field, incrementValue = 1) {
-      try {
-        const statsRef = db.collection('system_stats').doc('current');
-        await statsRef.update({
-          [field]: firebase.firestore.FieldValue.increment(incrementValue),
-          lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        console.log(`✅ Count updated: ${field} += ${incrementValue}`);
-      } catch (error) {
-        console.error('❌ Error updating count:', error);
-      }
-    }
-    
-    // Hàm ghi log hoạt động
-    async function logActivity(action, details) {
-      try {
-        await db.collection('activity_logs').add({
-          action: action,
-          details: details,
-          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        console.log(`✅ Activity logged: ${action}`);
-      } catch (error) {
-        console.error('❌ Error logging activity:', error);
-      }
-    }
-    
-    // Hàm cập nhật lớp mới thêm gần đây
-    async function updateRecentClasses(className) {
-      try {
-        const recentRef = db.collection('recent_data').doc('recent_classes');
-        const recentDoc = await recentRef.get();
-        
-        let recentClasses = [];
-        if (recentDoc.exists) {
-          recentClasses = recentDoc.data().classes || [];
-        }
-        
-        // Thêm lớp mới vào đầu danh sách
-        recentClasses.unshift({
-          name: className,
-          addedAt: new Date().toISOString()
-        });
-        
-        // Giới hạn danh sách 10 lớp gần nhất
-        if (recentClasses.length > 10) {
-          recentClasses = recentClasses.slice(0, 10);
-        }
-        
-        await recentRef.set({
-          classes: recentClasses,
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
-        
-        console.log('✅ Recent classes updated');
-      } catch (error) {
-        console.error('❌ Error updating recent classes:', error);
-      }
-    }
-    
-    // Hàm cập nhật học sinh mới thêm gần đây
-    async function updateRecentStudents(studentName, studentId) {
-      try {
-        const recentRef = db.collection('recent_data').doc('recent_students');
-        const recentDoc = await recentRef.get();
-        
-        let recentStudents = [];
-        if (recentDoc.exists) {
-          recentStudents = recentDoc.data().students || [];
-        }
-        
-        // Thêm học sinh mới vào đầu danh sách
-        recentStudents.unshift({
-          name: studentName,
-          studentId: studentId,
-          addedAt: new Date().toISOString()
-        });
-        
-        // Giới hạn danh sách 20 học sinh gần nhất
-        if (recentStudents.length > 20) {
-          recentStudents = recentStudents.slice(0, 20);
-        }
-        
-        await recentRef.set({
-          students: recentStudents,
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
-        
-        console.log('✅ Recent students updated');
-      } catch (error) {
-        console.error('❌ Error updating recent students:', error);
-      }
-    }
-    
-    // Hàm load và hiển thị thống kê
-    async function loadStatistics() {
-      try {
-        const statsRef = db.collection('system_stats').doc('current');
-        const statsDoc = await statsRef.get();
-        
-        if (statsDoc.exists) {
-          const stats = statsDoc.data();
-          
-          // Đếm tổng số lớp
-          const classesSnapshot = await db.collection('classes').get();
-          const totalClasses = classesSnapshot.size;
-          
-          // Đếm tổng số học sinh
-          const studentsSnapshot = await db.collection('students').get();
-          const totalStudents = studentsSnapshot.size;
-          
-          // Cập nhật UI
-          updateStatisticsUI(totalClasses, totalStudents, stats);
-        }
-      } catch (error) {
-        console.error('❌ Error loading statistics:', error);
-      }
-    }
-    
-    // Hàm cập nhật UI thống kê
-    function updateStatisticsUI(totalClasses, totalStudents, stats) {
-      // Cập nhật trên dashboard nếu có
-      const statsElements = {
-        'total-classes': totalClasses,
-        'total-students': totalStudents,
-        'students-added': stats.studentsAdded || 0,
-        'students-edited': stats.studentsEdited || 0,
-        'students-deleted': stats.studentsDeleted || 0
-      };
+    // ========================================
+    // CHECK EMAIL EXISTS (NO INDEX VERSION)
+    // ========================================
+    async function checkEmailExists(email, excludeStudentId = null) {
+      console.log(`🔍 Checking email: ${email}, exclude: ${excludeStudentId}`);
       
-      for (const [id, value] of Object.entries(statsElements)) {
-        const element = document.getElementById(id);
-        if (element) {
-          element.textContent = value;
+      try {
+        // Query students với email
+        const studentSnapshot = await db.collection('students')
+          .where('email', '==', email.toLowerCase())
+          .get();
+        
+        // Lọc thủ công trên client
+        let emailExists = false;
+        studentSnapshot.forEach(doc => {
+          const data = doc.data();
+          // Bỏ qua nếu là student đang edit và không bị xóa
+          if (doc.id !== excludeStudentId && (!data.isDeleted || data.isDeleted === false)) {
+            emailExists = true;
+          }
+        });
+        
+        return emailExists;
+        
+      } catch (error) {
+        console.error('❌ Error checking email:', error);
+        
+        // Fallback: query không có where, lọc toàn bộ (chỉ dùng khi ít dữ liệu)
+        if (error.code === 'failed-precondition') {
+          console.log('⚠️ Using fallback email check method');
+          try {
+            const allStudents = await db.collection('students').get();
+            let exists = false;
+            
+            allStudents.forEach(doc => {
+              const data = doc.data();
+              if (data.email && data.email.toLowerCase() === email.toLowerCase() && 
+                  doc.id !== excludeStudentId && 
+                  (!data.isDeleted || data.isDeleted === false)) {
+                exists = true;
+              }
+            });
+            
+            return exists;
+          } catch (fallbackError) {
+            console.error('❌ Fallback also failed:', fallbackError);
+            return false;
+          }
         }
+        
+        return false;
       }
-      
-      // Lưu vào localStorage để hiển thị trên các trang khác
-      localStorage.setItem('totalClasses', totalClasses);
-      localStorage.setItem('totalStudents', totalStudents);
-      
-      console.log('📊 Statistics updated:', { totalClasses, totalStudents, stats });
-    }
-    
-    // Hàm xem chi tiết học sinh
-    function viewStudentDetail(studentId) {
-      console.log('👁️ Viewing student detail:', studentId);
-      window.location.href = `student-detail.html?studentId=${studentId}`;
     }
 
-    // Check if required elements exist
-    console.log('🔍 Checking required elements:', {
-      classesList: !!classesList,
-      classStudentsList: !!classStudentsList,
-      btnAddClass: !!btnAddClass,
-      btnAddStudentToClass: !!btnAddStudentToClass
-    });
-
-    if (!classesList || !classStudentsList) {
-      console.error('❌ Critical elements missing!');
-      return;
-    }
-
-    // =========================
-    // 1️⃣ Load classes with placeholders
-    // =========================
-    let classCount = parseInt(localStorage.getItem('classCount')) || 3;
-    renderPlaceholders();
-
-    // =========================
-    // 2️⃣ Load actual classes from Firestore
-    // =========================
-    console.log('📦 Loading classes from Firestore...');
-    const classesUnsubscribe = db.collection('classes')
-      .orderBy('createdAt', 'desc')
-      .onSnapshot({
-        next: (snapshot) => {
-          console.log('✅ Classes snapshot:', snapshot.size, 'classes');
-          localStorage.setItem('classCount', snapshot.size);
-          renderClasses(snapshot);
-          
-          // Load thống kê
-          loadStatistics();
-        },
-        error: (error) => {
-          console.error('❌ Error loading classes:', error);
-          classesList.innerHTML = '<div class="error">Lỗi tải danh sách lớp: ' + error.message + '</div>';
-        }
+    // ========================================
+    // EVENT LISTENERS
+    // ========================================
+    if (btnAddClass) {
+      btnAddClass.addEventListener('click', function(e) {
+        e.preventDefault();
+        openAddClassModal();
       });
-
-    // =========================
-    // Event Listeners
-    // =========================
-    btnAddClass.addEventListener('click', function(e) {
-      e.preventDefault();
-      openAddClassModal();
-    });
+    }
     
-    btnBackToClasses.addEventListener('click', function(e) {
-      e.preventDefault();
-      showClassListView();
-    });
+    if (btnBackToClasses) {
+      btnBackToClasses.addEventListener('click', function(e) {
+        e.preventDefault();
+        showClassListView();
+      });
+    }
     
     if (btnAddStudentToClass) {
       btnAddStudentToClass.addEventListener('click', function(e) {
         e.preventDefault();
         openAddStudentModal();
       });
-    } else {
-      console.error('❌ btnAddStudentToClass not found');
     }
 
-    closeModalBtn.addEventListener('click', function(e) {
-      e.preventDefault();
-      hideModal('class-modal');
-    });
+    if (closeModalBtn) {
+      closeModalBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        hideModal('class-modal');
+      });
+    }
     
-    saveClassBtn.addEventListener('click', function(e) {
-      e.preventDefault();
-      saveClass();
-    });
+    if (saveClassBtn) {
+      saveClassBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        saveClass();
+      });
+    }
 
     if (closeAddStudentModalBtn) {
       closeAddStudentModalBtn.addEventListener('click', function(e) {
@@ -399,7 +235,6 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     }
 
-    // Edit student modal events
     if (closeEditStudentModalBtn) {
       closeEditStudentModalBtn.addEventListener('click', function(e) {
         e.preventDefault();
@@ -425,35 +260,32 @@ document.addEventListener('DOMContentLoaded', function () {
       console.log('📸 Edit student photo selected:', currentPhotoFile?.name || 'None');
     });
 
-    // Ngăn submit form khi nhấn Enter
-    document.querySelectorAll('.modal input, .modal select').forEach(element => {
-      element.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          return false;
-        }
-      });
-    });
-
-    // =========================
-    // Core Functions
-    // =========================
-    function renderPlaceholders() {
+    // ========================================
+    // CORE FUNCTIONS
+    // ========================================
+    function renderPlaceholders(count = 3) {
+      if (!classesList) return;
+      
       classesList.innerHTML = '';
-      for (let i = 0; i < classCount; i++) {
+      for (let i = 0; i < count; i++) {
         const placeholder = document.createElement('div');
         placeholder.className = 'class-card glass placeholder';
         placeholder.innerHTML = `
-          <h3>Đang tải <img src="https://i.gifer.com/ZZ5H.gif" style="width:16px;height:16px;vertical-align:middle"></h3>
+          <h3>Đang tải...</h3>
           <p>Khối: ...</p>
           <p>GVCN: ...</p>
-          <p>Sỉ số: ...</p>
+          <p>Sĩ số: ...</p>
         `;
         classesList.appendChild(placeholder);
       }
     }
 
     function renderClasses(snapshot) {
+      if (!classesList) {
+        console.error('❌ classesList element not found');
+        return;
+      }
+      
       console.log('🎨 Rendering classes...');
       classesList.innerHTML = '';
 
@@ -465,7 +297,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
       snapshot.forEach(doc => {
         const data = doc.data();
-        console.log(`🏫 Rendering class: ${data.name} (${doc.id})`);
         
         const classCard = document.createElement('div');
         classCard.className = 'class-card glass';
@@ -474,7 +305,7 @@ document.addEventListener('DOMContentLoaded', function () {
             <h3>${data.name}</h3>
             <p>Khối: ${data.grade || 'Chưa cập nhật'}</p>
             <p>GVCN: ${data.teacher || 'Chưa cập nhật'}</p>
-            <p>Sỉ số: <span class="student-count-${doc.id}">0</span> học sinh</p>
+            <p>Sĩ số: <span class="student-count-${doc.id}">0</span> học sinh</p>
           </div>
           <div class="class-card-actions">
             <button class="btn-secondary view-class" data-id="${doc.id}" type="button">Xem học sinh</button>
@@ -501,10 +332,8 @@ document.addEventListener('DOMContentLoaded', function () {
           db.collection('classes').doc(classId).get()
             .then(doc => {
               if (doc.exists) {
-                console.log('✅ Class found, showing detail view');
                 showClassDetailView(classId, doc.data());
               } else {
-                console.error('❌ Class not found:', classId);
                 alert('Lớp học không tồn tại!');
               }
             })
@@ -537,8 +366,8 @@ document.addEventListener('DOMContentLoaded', function () {
     function showClassListView() {
       console.log('📋 Showing class list view');
       
-      document.getElementById('class-list-view').classList.remove('hidden');
-      document.getElementById('class-detail-view').classList.add('hidden');
+      document.getElementById('class-list-view')?.classList.remove('hidden');
+      document.getElementById('class-detail-view')?.classList.add('hidden');
       
       // Unsubscribe from student listener
       if (classStudentsUnsubscribe) {
@@ -551,34 +380,35 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function showClassDetailView(classId, classData) {
-      console.log('🎯 Showing class detail view:', {
-        classId: classId,
-        classData: classData
-      });
+      console.log('🎯 Showing class detail view for:', classData.name);
       
-      document.getElementById('class-list-view').classList.add('hidden');
-      document.getElementById('class-detail-view').classList.remove('hidden');
+      document.getElementById('class-list-view')?.classList.add('hidden');
+      document.getElementById('class-detail-view')?.classList.remove('hidden');
       
       currentClassId = classId;
       
       // Update class info
-      document.getElementById('class-detail-title').textContent = classData.name;
-      document.getElementById('class-detail-name').textContent = classData.name;
-      document.getElementById('class-detail-grade').textContent = classData.grade || 'Chưa cập nhật';
-      document.getElementById('class-detail-teacher').textContent = classData.teacher || 'Chưa cập nhật';
+      const titleEl = document.getElementById('class-detail-title');
+      const nameEl = document.getElementById('class-detail-name');
+      const gradeEl = document.getElementById('class-detail-grade');
+      const teacherEl = document.getElementById('class-detail-teacher');
+      
+      if (titleEl) titleEl.textContent = classData.name;
+      if (nameEl) nameEl.textContent = classData.name;
+      if (gradeEl) gradeEl.textContent = classData.grade || 'Chưa cập nhật';
+      if (teacherEl) teacherEl.textContent = classData.teacher || 'Chưa cập nhật';
       
       // Load students for this class
       loadClassStudents(classId);
     }
 
     function loadClassStudents(classId) {
-      console.log('👨‍🎓 Loading students for class:', classId);
-      
       if (!classStudentsList) {
         console.error('❌ classStudentsList element not found');
         return;
       }
       
+      console.log('👨‍🎓 Loading students for class:', classId);
       classStudentsList.innerHTML = '<div class="loading">Đang tải học sinh...</div>';
 
       // Unsubscribe from previous listener
@@ -587,14 +417,12 @@ document.addEventListener('DOMContentLoaded', function () {
         classStudentsUnsubscribe();
       }
 
-      // Real-time listener for students in this class
-      console.log(`🔍 Querying: students where classId == "${classId}"`);
-      
+      // Load students WITHOUT isDeleted filter (we'll filter manually)
       classStudentsUnsubscribe = db.collection('students')
         .where('classId', '==', classId)
         .onSnapshot({
           next: (snapshot) => {
-            console.log('✅ Students query result:', snapshot.size, 'students');
+            console.log('✅ Students loaded:', snapshot.size, 'total');
             
             classStudentsList.innerHTML = '';
             
@@ -607,16 +435,23 @@ document.addEventListener('DOMContentLoaded', function () {
 
             let studentCount = 0;
             snapshot.forEach(doc => {
-              studentCount++;
               const data = doc.data();
-              renderStudentCard(doc.id, data);
+              // Filter manually on client side
+              if (!data.isDeleted || data.isDeleted === false) {
+                studentCount++;
+                renderStudentCard(doc.id, data);
+              }
             });
 
             updateStudentCount(studentCount);
             attachStudentEventListeners();
+            
+            if (studentCount === 0) {
+              classStudentsList.innerHTML = '<div class="no-data">Chưa có học sinh nào trong lớp này</div>';
+            }
           },
           error: (error) => {
-            console.error('❌ Error in students query:', error);
+            console.error('❌ Error loading students:', error);
             classStudentsList.innerHTML = `
               <div class="error" style="grid-column: 1/-1; text-align: center; padding: 40px; color: white;">
                 Lỗi tải danh sách học sinh: ${error.message}
@@ -631,7 +466,7 @@ document.addEventListener('DOMContentLoaded', function () {
       studentCard.className = 'student-card glass';
       
       // Tạo icon giới tính
-      const genderIcon = data.gender === 'male' ? '♂' : data.gender === 'female' ? '♀' : '?';
+      const genderIcon = data.gender === 'male' ? '♂️' : data.gender === 'female' ? '♀️' : '?';
       const genderClass = data.gender === 'male' ? 'gender-male' : data.gender === 'female' ? 'gender-female' : 'gender-unknown';
       
       studentCard.innerHTML = `
@@ -698,6 +533,11 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     }
 
+    function viewStudentDetail(studentId) {
+      console.log('👁️ Viewing student detail:', studentId);
+      window.location.href = `student-detail.html?studentId=${studentId}`;
+    }
+
     function updateStudentCount(count) {
       console.log('🔢 Updating student count:', count);
       
@@ -726,16 +566,6 @@ document.addEventListener('DOMContentLoaded', function () {
           });
           
           console.log('✅ Student removed from class');
-          
-          // Cập nhật thống kê
-          await updateStatistics('studentsDeleted');
-          
-          // Ghi log hoạt động
-          await logActivity('remove_student_from_class', {
-            studentId: studentId,
-            classId: currentClassId
-          });
-          
           alert('Đã xóa học sinh khỏi lớp!');
         } catch (error) {
           console.error('❌ Error removing student:', error);
@@ -804,7 +634,9 @@ document.addEventListener('DOMContentLoaded', function () {
     async function saveEditStudent() {
       console.log('💾 Saving edited student...');
       
-      // Disable button để tránh double click
+      if (!saveEditStudentBtn) return;
+      
+      // Disable button
       saveEditStudentBtn.disabled = true;
       const originalText = saveEditStudentBtn.textContent;
       saveEditStudentBtn.textContent = 'Đang lưu...';
@@ -815,13 +647,26 @@ document.addEventListener('DOMContentLoaded', function () {
         const studentId = document.getElementById('edit-stu-id').value.trim();
         const birthdate = document.getElementById('edit-stu-birthdate').value;
         const phone = document.getElementById('edit-stu-phone').value.trim();
-        const email = document.getElementById('edit-stu-email').value.trim();
+        const email = document.getElementById('edit-stu-email').value.trim().toLowerCase();
         const gender = document.getElementById('edit-stu-gender').value;
 
         console.log('📝 Edit form data:', { name, studentId, birthdate, phone, email, gender });
 
         if (!name) {
           alert('Vui lòng nhập họ tên học sinh!');
+          return;
+        }
+
+        if (!email) {
+          alert('Vui lòng nhập email học sinh!');
+          return;
+        }
+
+        // 🔍 KIỂM TRA EMAIL TRÙNG (sử dụng hàm mới)
+        const emailExists = await checkEmailExists(email, editingStudentId);
+        if (emailExists) {
+          alert('❌ Email đã tồn tại cho học sinh khác! Vui lòng sử dụng email khác.');
+          document.getElementById('edit-stu-email').focus();
           return;
         }
 
@@ -860,7 +705,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
           } catch (uploadError) {
             console.error('❌ Photo upload failed:', uploadError);
-            // Vẫn tiếp tục cập nhật thông tin khác
           }
         }
 
@@ -871,24 +715,8 @@ document.addEventListener('DOMContentLoaded', function () {
         
         console.log('✅ Student updated successfully');
         
-        // Cập nhật thống kê
-        await updateStatistics('studentsEdited');
-        
-        // Ghi log hoạt động (dùng tên lớp mới từ updateData)
-        await logActivity('edit_student', {
-          studentId: editingStudentId,
-          name: name,
-          className: updateData.className || studentData.className || 'Chưa có lớp',
-          classId: studentData.classId || ''
-        });
-        
-        // Hiển thị thông báo thành công
         alert('Cập nhật học sinh thành công!');
-        
-        // Đóng modal
         closeEditStudentModal();
-        
-        // Refresh danh sách học sinh (tự động qua listener)
         
       } catch (error) {
         console.error('❌ Error saving student:', error);
@@ -905,10 +733,18 @@ document.addEventListener('DOMContentLoaded', function () {
         .where('classId', '==', classId)
         .get()
         .then(snapshot => {
+          let count = 0;
+          snapshot.forEach(doc => {
+            const data = doc.data();
+            if (!data.isDeleted || data.isDeleted === false) {
+              count++;
+            }
+          });
+          
           const countElement = document.querySelector(`.student-count-${classId}`);
           if (countElement) {
-            countElement.textContent = snapshot.size;
-            console.log(`📊 Student count for ${classId}: ${snapshot.size}`);
+            countElement.textContent = count;
+            console.log(`📊 Student count for ${classId}: ${count}`);
           }
         })
         .catch(error => {
@@ -944,7 +780,9 @@ document.addEventListener('DOMContentLoaded', function () {
     async function saveNewStudent() {
       console.log('💾 Saving new student...');
       
-      // Disable button để tránh double click
+      if (!saveNewStudentBtn) return;
+      
+      // Disable button
       saveNewStudentBtn.disabled = true;
       const originalText = saveNewStudentBtn.textContent;
       saveNewStudentBtn.textContent = 'Đang thêm...';
@@ -955,7 +793,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const studentIdInput = document.getElementById('new-stu-id').value.trim();
         const birthdate = document.getElementById('new-stu-birthdate').value;
         const phone = document.getElementById('new-stu-phone').value.trim();
-        const email = document.getElementById('new-stu-email').value.trim();
+        const email = document.getElementById('new-stu-email').value.trim().toLowerCase();
         const gender = document.getElementById('new-stu-gender').value;
 
         console.log('📝 Student form data:', {
@@ -967,8 +805,21 @@ document.addEventListener('DOMContentLoaded', function () {
           return;
         }
 
+        if (!email) {
+          alert('Vui lòng nhập email học sinh!');
+          return;
+        }
+
         if (!currentClassId) {
           alert('Lỗi: Không tìm thấy lớp học!');
+          return;
+        }
+
+        // 🔍 KIỂM TRA EMAIL ĐÃ TỒN TẠI CHƯA
+        const emailExists = await checkEmailExists(email);
+        if (emailExists) {
+          alert('❌ Email đã tồn tại trong hệ thống! Vui lòng sử dụng email khác.');
+          document.getElementById('new-stu-email').focus();
           return;
         }
 
@@ -989,7 +840,8 @@ document.addEventListener('DOMContentLoaded', function () {
           gender: gender,
           classId: currentClassId,
           className: classData.name,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          isDeleted: false
         };
 
         console.log('💾 Saving student data:', studentData);
@@ -1006,7 +858,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
           } catch (uploadError) {
             console.error('❌ Photo upload failed:', uploadError);
-            // Vẫn tiếp tục lưu học sinh không có ảnh
           }
         }
 
@@ -1014,34 +865,15 @@ document.addEventListener('DOMContentLoaded', function () {
         const docRef = await db.collection('students').add(studentData);
         
         console.log('✅ Student added successfully, ID:', docRef.id);
-        
-        // Cập nhật thống kê
-        await updateStatistics('studentsAdded');
-        
-        // Cập nhật số lượng học sinh
-        await updateCount('totalStudents', 1);
-        
-        // Ghi log hoạt động
-        await logActivity('add_student', {
-          studentId: docRef.id,
-          name: name,
-          className: classData.name,
-          classId: currentClassId
-        });
-        
-        // Cập nhật học sinh mới thêm gần đây
-        await updateRecentStudents(name, studentIdInput);
 
         // 🎯 Gửi mã xác nhận qua email
         try {
           console.log('📧 Gửi mã xác nhận đến:', email);
-          console.log('🌐 Gọi API: http://localhost:3000/send-verification-code');
           
           const requestBody = JSON.stringify({
             studentEmail: email,
             studentName: name
           });
-          console.log('📤 Request body:', requestBody);
           
           const response = await fetch('http://localhost:3000/send-verification-code', {
             method: 'POST',
@@ -1053,7 +885,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
           console.log('📬 Response status:', response.status);
           const result = await response.json();
-          console.log('📬 Response body:', result);
 
           if (result.success && result.verificationCode) {
             // Lưu mã xác nhận vào Firestore
@@ -1071,17 +902,11 @@ document.addEventListener('DOMContentLoaded', function () {
           }
         } catch (err) {
           console.error('❌ Lỗi gửi email (catch):', err);
-          console.error('Error details:', err.message);
           alert('Thêm học sinh thành công!\n\n⚠️ Không thể gửi email. Lỗi: ' + err.message);
         }
         
-        // Hiển thị thông báo thành công (nếu code trên không hiển thị)
-        // alert('Thêm học sinh thành công!');
-        
         // Đóng modal
         closeAddStudentModal();
-        
-        // Refresh danh sách học sinh (tự động qua listener)
         
       } catch (error) {
         console.error('❌ Error saving student:', error);
@@ -1124,7 +949,9 @@ document.addEventListener('DOMContentLoaded', function () {
     async function saveClass() {
       console.log('💾 Saving class...');
       
-      // Disable button để tránh double click
+      if (!saveClassBtn) return;
+      
+      // Disable button
       saveClassBtn.disabled = true;
       const originalText = saveClassBtn.textContent;
       saveClassBtn.textContent = 'Đang lưu...';
@@ -1153,40 +980,13 @@ document.addEventListener('DOMContentLoaded', function () {
         if (editingClassId) {
           console.log('✏️ Updating existing class:', editingClassId);
           await db.collection('classes').doc(editingClassId).update(classData);
-          
-          // Ghi log hoạt động
-          await logActivity('edit_class', {
-            classId: editingClassId,
-            name: name,
-            grade: grade,
-            teacher: teacher
-          });
-          
           alert('Cập nhật lớp thành công!');
         } else {
           console.log('➕ Adding new class');
           classData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-          const docRef = await db.collection('classes').add(classData);
-          
-          // Cập nhật số lượng lớp
-          await updateCount('totalClasses', 1);
-          
-          // Ghi log hoạt động
-          await logActivity('add_class', {
-            classId: docRef.id,
-            name: name,
-            grade: grade,
-            teacher: teacher
-          });
-          
-          // Cập nhật lớp mới thêm gần đây
-          await updateRecentClasses(name);
-          
+          await db.collection('classes').add(classData);
           alert('Thêm lớp thành công!');
         }
-        
-        // Reload statistics
-        await loadStatistics();
         
       } catch (error) {
         console.error('❌ Error saving class:', error);
@@ -1207,44 +1007,33 @@ document.addEventListener('DOMContentLoaded', function () {
         const classDoc = await db.collection('classes').doc(classId).get();
         const classData = classDoc.data();
         
-        // Xóa tất cả học sinh trong lớp
-        const snapshot = await db.collection('students').where('classId', '==', classId).get();
+        // Tìm và đánh dấu tất cả học sinh trong lớp là đã xóa
+        const snapshot = await db.collection('students')
+          .where('classId', '==', classId)
+          .get();
+        
         const batch = db.batch();
         let studentCount = 0;
         snapshot.forEach(doc => {
-          batch.delete(doc.ref);
+          batch.update(doc.ref, {
+            isDeleted: true,
+            deletedAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
           studentCount++;
         });
         await batch.commit();
         
-        console.log(`✅ Deleted ${studentCount} students from class`);
+        console.log(`✅ Marked ${studentCount} students as deleted`);
         
         // Delete class
         await db.collection('classes').doc(classId).delete();
         
-        // Cập nhật số lượng lớp
-        await updateCount('totalClasses', -1);
-        
-        // Cập nhật số lượng học sinh
-        if (studentCount > 0) {
-          await updateCount('totalStudents', -studentCount);
-        }
-        
-        // Ghi log hoạt động
-        await logActivity('delete_class', {
-          classId: classId,
-          name: classData.name,
-          grade: classData.grade,
-          teacher: classData.teacher,
-          studentsDeleted: studentCount
-        });
-        
         console.log('✅ Class deleted successfully');
-        
-        // Reload statistics
-        await loadStatistics();
-        
         alert('Xóa lớp thành công!');
+        
+        // Quay lại danh sách lớp
+        showClassListView();
+        
       } catch (error) {
         console.error('❌ Error deleting class:', error);
         alert('Lỗi xóa lớp: ' + error.message);
@@ -1269,11 +1058,34 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     }
 
-    // Cleanup
-    window.addEventListener('beforeunload', () => {
-      console.log('🧹 Cleaning up listeners...');
-      if (classStudentsUnsubscribe) classStudentsUnsubscribe();
-      if (classesUnsubscribe) classesUnsubscribe();
-    });
+    // ========================================
+    // INITIALIZATION
+    // ========================================
+    if (classesList) {
+      // Hiển thị placeholder
+      renderPlaceholders();
+      
+      // Load classes từ Firestore
+      console.log('📦 Loading classes from Firestore...');
+      const classesUnsubscribe = db.collection('classes')
+        .orderBy('createdAt', 'desc')
+        .onSnapshot({
+          next: (snapshot) => {
+            console.log('✅ Classes loaded:', snapshot.size, 'classes');
+            renderClasses(snapshot);
+          },
+          error: (error) => {
+            console.error('❌ Error loading classes:', error);
+            classesList.innerHTML = '<div class="error">Lỗi tải danh sách lớp: ' + error.message + '</div>';
+          }
+        });
+
+      // Cleanup
+      window.addEventListener('beforeunload', () => {
+        console.log('🧹 Cleaning up listeners...');
+        if (classStudentsUnsubscribe) classStudentsUnsubscribe();
+        if (classesUnsubscribe) classesUnsubscribe();
+      });
+    }
   }
 });

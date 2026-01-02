@@ -550,8 +550,27 @@ async function saveStudentHandler() {
           console.log('💾 Lưu mã xác nhận vào Firestore:', result.verificationCode);
           await db.collection('students').doc(newDoc.id).update({
             verificationCode: result.verificationCode,
-            verificationCodeCreatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            verificationCodeCreatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            ...(result.firebaseUid ? { userId: result.firebaseUid } : {})
           });
+
+          // Nếu server trả về firebaseUid (firebase-admin bật), tạo luôn user profile cho học sinh
+          if (result.firebaseUid) {
+            try {
+              await db.collection('users').doc(result.firebaseUid).set({
+                email: email,
+                name: name,
+                role: 'student',
+                studentId: newDoc.id,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+              }, { merge: true });
+              console.log('✅ Created/updated users doc for student uid:', result.firebaseUid);
+            } catch (e) {
+              console.warn('⚠️ Could not create users doc for student:', e);
+            }
+          } else {
+            console.warn('⚠️ Server did not return firebaseUid. Student Auth user may not be created (check server firebase-admin config).');
+          }
 
           console.log('✅ Mã xác nhận đã gửi và lưu thành công');
           alert('✅ Thêm học sinh thành công!\n\n📧 Mã xác nhận: ' + result.verificationCode + '\n\nEmail: ' + email);

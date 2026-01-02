@@ -1,9 +1,42 @@
 // Nạp các biến môi trường từ file .env vào process.env.
 // Giữ khóa API và cấu hình nhạy cảm ngoài source code.
-require("dotenv").config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const express = require("express");
 const cors = require("cors");
+
+// Optional admin SDK for managing Firebase Auth users (used to create student accounts)
+let admin = null;
+let adminInitialized = false;
+try {
+  admin = require('firebase-admin');
+  let serviceAccount = null;
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    try {
+      serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    } catch (e) {
+      console.warn('⚠️ FIREBASE_SERVICE_ACCOUNT provided but JSON parse failed:', e.message);
+    }
+  } else if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
+    try {
+      serviceAccount = require(process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
+    } catch (e) {
+      console.warn('⚠️ Could not load service account from path:', process.env.FIREBASE_SERVICE_ACCOUNT_PATH, e.message);
+    }
+  }
+
+  if (serviceAccount) {
+    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+    adminInitialized = true;
+    console.log('✅ firebase-admin initialized');
+  } else {
+    console.warn('⚠️ firebase-admin not initialized: no service account configured (FIREBASE_SERVICE_ACCOUNT or FIREBASE_SERVICE_ACCOUNT_PATH)');
+  }
+} catch (err) {
+  console.warn('⚠️ firebase-admin not available or failed to init:', err.message);
+  admin = null;
+}
 
 // Email utility
 const { generateVerificationCode, sendVerificationEmail } = require("./utils/email");
@@ -50,15 +83,45 @@ app.post("/send-verification-code", async (req, res) => {
     const verificationCode = generateVerificationCode();
     console.log('🔐 Mã xác nhận được tạo:', verificationCode);
 
+    // Create or update Firebase auth user if admin is available
+    let firebaseUid = null;
+    if (adminInitialized && admin) {
+      try {
+        // Try to find existing user
+        try {
+          const userRecord = await admin.auth().getUserByEmail(studentEmail);
+          // Update password
+          await admin.auth().updateUser(userRecord.uid, { password: verificationCode });
+          firebaseUid = userRecord.uid;
+          console.log('🔁 Updated existing Firebase user password for', studentEmail);
+        } catch (err) {
+          // If user not found, create
+          if (err.code === 'auth/user-not-found') {
+            const newUser = await admin.auth().createUser({ email: studentEmail, password: verificationCode });
+            firebaseUid = newUser.uid;
+            console.log('✅ Created new Firebase user for', studentEmail);
+          } else {
+            throw err;
+          }
+        }
+      } catch (err) {
+        console.warn('⚠️ Could not create/update Firebase user:', err.message);
+        // Continue anyway; email will still be sent
+      }
+    } else {
+      console.warn('⚠️ firebase-admin not initialized. Firebase Auth user will not be created. Set FIREBASE_SERVICE_ACCOUNT to enable.');
+    }
+
     // Gửi email
     console.log('📧 Đang gửi email tới:', studentEmail);
     await sendVerificationEmail(studentEmail, studentName, verificationCode);
 
-    // Trả về mã cho client (lưu trong Firebase)
+    // Trả về mã cho client (lưu trong Firestore)
     res.status(200).json({
       success: true,
       message: "Mã xác nhận đã gửi thành công!",
-      verificationCode: verificationCode // Client sẽ lưu vào Firestore
+      verificationCode: verificationCode,
+      firebaseUid: firebaseUid || null
     });
 
   } catch (error) {
@@ -110,6 +173,21 @@ app.post("/upload", (req, res) => {
       });
     });
   });
+});
+
+// Health check for firebase-admin and server internals
+app.get('/admin-status', (req, res) => {
+  try {
+    const info = {
+      firebaseAdminAvailable: !!admin,
+      firebaseAdminInitialized: !!adminInitialized,
+      nodeEnv: process.env.NODE_ENV || 'development',
+      timestamp: new Date().toISOString()
+    };
+    return res.status(200).json({ success: true, info });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 
